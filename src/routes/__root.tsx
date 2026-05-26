@@ -76,10 +76,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "AI-powered personalized STEM learning platform for Math, Physics, Chemistry, and Programming." },
       { name: "author", content: "STEMOS" },
       { property: "og:title", content: "STEMOS — The Future of STEM Learning" },
-      { property: "og:description", content: "AI-powered personalized STEM learning platform." },
+      { property: "og:description", content: "AI-powered personalized STEM learning platform for Math, Physics, Chemistry, and Programming." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "STEMOS — The Future of STEM Learning" },
+      { name: "twitter:description", content: "AI-powered personalized STEM learning platform for Math, Physics, Chemistry, and Programming." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d6e81a92-84db-4aab-a633-2f37ded15446/id-preview-29e44c2b--10c14ad6-5b93-4acc-a2d5-f005b37ff0c3.lovable.app-1779780533188.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d6e81a92-84db-4aab-a633-2f37ded15446/id-preview-29e44c2b--10c14ad6-5b93-4acc-a2d5-f005b37ff0c3.lovable.app-1779780533188.png" },
     ],
     links: [
       {
