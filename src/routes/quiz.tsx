@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, Clock, Trophy, RotateCcw, Sparkles, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
+import { Check, X, Clock, Trophy, RotateCcw, Sparkles, ChevronRight, Loader2 } from "lucide-react";
 import { Layout } from "@/components/site/Layout";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/quiz")({
   head: () => ({
@@ -14,52 +16,24 @@ export const Route = createFileRoute("/quiz")({
   component: QuizPage,
 });
 
-type Q = { q: string; opts: string[]; answer: number; explain: string };
+type Q = { question: string; options: string[]; correct_index: number; explanation: string };
 
-const banks: Record<string, Q[]> = {
-  Physics: [
-    { q: "Which law states that for every action there is an equal and opposite reaction?", opts: ["Newton's 1st Law", "Newton's 2nd Law", "Newton's 3rd Law", "Law of Gravitation"], answer: 2, explain: "Newton's 3rd Law describes action-reaction pairs." },
-    { q: "The SI unit of electric current is:", opts: ["Volt", "Ampere", "Ohm", "Watt"], answer: 1, explain: "Current is measured in Amperes (A)." },
-    { q: "Speed of light in vacuum is approximately:", opts: ["3 × 10⁶ m/s", "3 × 10⁸ m/s", "3 × 10¹⁰ m/s", "3 × 10⁵ m/s"], answer: 1, explain: "c ≈ 299,792,458 m/s ≈ 3 × 10⁸ m/s." },
-    { q: "What does E = mc² describe?", opts: ["Wave-particle duality", "Mass-energy equivalence", "Uncertainty principle", "Conservation of momentum"], answer: 1, explain: "Einstein's famous mass-energy equivalence." },
-    { q: "Which particle has no electric charge?", opts: ["Proton", "Electron", "Neutron", "Positron"], answer: 2, explain: "Neutrons are electrically neutral." },
-  ],
-  Math: [
-    { q: "What is the derivative of sin(x)?", opts: ["cos(x)", "-cos(x)", "-sin(x)", "tan(x)"], answer: 0, explain: "d/dx sin(x) = cos(x)." },
-    { q: "Value of π to 4 decimal places:", opts: ["3.1414", "3.1415", "3.1416", "3.1417"], answer: 2, explain: "π ≈ 3.14159… rounds to 3.1416." },
-    { q: "Solve: 2x + 5 = 13", opts: ["x = 3", "x = 4", "x = 5", "x = 6"], answer: 1, explain: "2x = 8, x = 4." },
-    { q: "log₁₀(1000) = ?", opts: ["2", "3", "10", "100"], answer: 1, explain: "10³ = 1000, so log = 3." },
-    { q: "Area of a circle with r = 5:", opts: ["10π", "25π", "5π", "50π"], answer: 1, explain: "A = πr² = 25π." },
-  ],
-  Chemistry: [
-    { q: "Atomic number of Carbon:", opts: ["4", "6", "8", "12"], answer: 1, explain: "Carbon has 6 protons." },
-    { q: "pH of pure water at 25°C:", opts: ["0", "7", "14", "1"], answer: 1, explain: "Pure water is neutral, pH = 7." },
-    { q: "Chemical symbol for Gold:", opts: ["Go", "Gd", "Au", "Ag"], answer: 2, explain: "Au from Latin 'aurum'." },
-    { q: "Number of electrons in a neutral oxygen atom:", opts: ["6", "7", "8", "16"], answer: 2, explain: "Oxygen's atomic number is 8." },
-    { q: "Which is a noble gas?", opts: ["Nitrogen", "Oxygen", "Argon", "Hydrogen"], answer: 2, explain: "Argon (group 18) is a noble gas." },
-  ],
-  Coding: [
-    { q: "Which data structure uses LIFO?", opts: ["Queue", "Stack", "Tree", "Graph"], answer: 1, explain: "Stack = Last In, First Out." },
-    { q: "Time complexity of binary search:", opts: ["O(n)", "O(log n)", "O(n²)", "O(1)"], answer: 1, explain: "Halving the search space each step → log n." },
-    { q: "Which is NOT a JavaScript primitive?", opts: ["string", "number", "object", "boolean"], answer: 2, explain: "Object is a reference type." },
-    { q: "HTTP status 404 means:", opts: ["OK", "Not Found", "Server Error", "Redirect"], answer: 1, explain: "404 = resource not found." },
-    { q: "Git command to create a new branch:", opts: ["git new", "git fork", "git branch", "git make"], answer: 2, explain: "git branch <name> creates a branch." },
-  ],
-};
-
+const subjects = ["Physics", "Mathematics", "Chemistry", "Biology", "Programming"] as const;
 const difficulties = ["Easy", "Medium", "Hard"] as const;
 
 function QuizPage() {
   const [topic, setTopic] = useState<string>("");
   const [diff, setDiff] = useState<(typeof difficulties)[number]>("Medium");
+  const [generating, setGenerating] = useState(false);
+  const [questions, setQuestions] = useState<Q[]>([]);
   const [started, setStarted] = useState(false);
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [time, setTime] = useState(30);
   const [finished, setFinished] = useState(false);
+  const [startedAt, setStartedAt] = useState<number>(0);
 
-  const questions = topic ? banks[topic] : [];
   const current = questions[idx];
 
   useEffect(() => {
@@ -67,23 +41,92 @@ function QuizPage() {
     if (time <= 0) { handleAnswer(-1); return; }
     const t = setTimeout(() => setTime(time - 1), 1000);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [time, started, finished, selected]);
 
-  const start = () => {
-    setStarted(true); setIdx(0); setScore(0); setSelected(null); setTime(30); setFinished(false);
+  const generate = async () => {
+    if (!topic) return;
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: topic, difficulty: diff, count: 5 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate");
+      if (!Array.isArray(data.questions) || data.questions.length === 0) {
+        throw new Error("No questions returned");
+      }
+      setQuestions(data.questions as Q[]);
+      setStarted(true);
+      setIdx(0);
+      setScore(0);
+      setSelected(null);
+      setTime(30);
+      setFinished(false);
+      setStartedAt(Date.now());
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not generate quiz");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const saveAttempt = async (finalScore: number) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const xp = finalScore * 20;
+    await supabase.from("quiz_attempts").insert({
+      user_id: session.user.id,
+      subject: topic,
+      difficulty: diff,
+      score: finalScore,
+      total_questions: questions.length,
+      duration_seconds: Math.floor((Date.now() - startedAt) / 1000),
+      xp_earned: xp,
+    });
+    // increment xp on profile
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("total_xp")
+      .eq("id", session.user.id)
+      .maybeSingle();
+    if (prof) {
+      await supabase
+        .from("profiles")
+        .update({
+          total_xp: (prof.total_xp ?? 0) + xp,
+          last_activity_date: new Date().toISOString().slice(0, 10),
+        })
+        .eq("id", session.user.id);
+    }
   };
 
   const handleAnswer = (i: number) => {
     if (selected !== null) return;
     setSelected(i);
-    if (i === current.answer) setScore((s) => s + 1);
+    const correct = i === current.correct_index;
+    const nextScore = correct ? score + 1 : score;
+    if (correct) setScore(nextScore);
     setTimeout(() => {
-      if (idx + 1 >= questions.length) setFinished(true);
-      else { setIdx(idx + 1); setSelected(null); setTime(30); }
-    }, 1400);
+      if (idx + 1 >= questions.length) {
+        setFinished(true);
+        saveAttempt(nextScore);
+      } else {
+        setIdx(idx + 1);
+        setSelected(null);
+        setTime(30);
+      }
+    }, 1600);
   };
 
-  const reset = () => { setStarted(false); setTopic(""); setFinished(false); };
+  const reset = () => {
+    setStarted(false); setTopic(""); setFinished(false); setQuestions([]);
+  };
+  const retry = () => {
+    setIdx(0); setScore(0); setSelected(null); setTime(30); setFinished(false); setStartedAt(Date.now());
+  };
 
   return (
     <Layout>
@@ -92,13 +135,13 @@ function QuizPage() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <div className="text-xs font-medium text-primary uppercase tracking-widest">Quiz Generator</div>
             <h1 className="mt-3 font-display text-4xl md:text-5xl font-semibold tracking-tight">Test your knowledge</h1>
-            <p className="mt-3 text-muted-foreground">Pick a subject and difficulty. Get 5 questions, 30 seconds each.</p>
+            <p className="mt-3 text-muted-foreground">Pick a subject and difficulty. AI generates 5 fresh questions every time.</p>
 
             <div className="mt-10 space-y-8">
               <div>
                 <div className="text-sm font-medium mb-3">Choose a subject</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {Object.keys(banks).map((t) => (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {subjects.map((t) => (
                     <button
                       key={t}
                       onClick={() => setTopic(t)}
@@ -106,7 +149,7 @@ function QuizPage() {
                     >
                       <Sparkles className="h-5 w-5 text-primary mb-3" />
                       <div className="font-medium">{t}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{banks[t].length} questions</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">AI-generated</div>
                     </button>
                   ))}
                 </div>
@@ -128,11 +171,19 @@ function QuizPage() {
               </div>
 
               <button
-                disabled={!topic}
-                onClick={start}
+                disabled={!topic || generating}
+                onClick={generate}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-hero text-primary-foreground px-5 py-3.5 text-sm font-medium shadow-glow disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                Generate quiz <ChevronRight className="h-4 w-4" />
+                {generating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Generating your quiz…
+                  </>
+                ) : (
+                  <>
+                    Generate quiz <ChevronRight className="h-4 w-4" />
+                  </>
+                )}
               </button>
             </div>
           </motion.div>
@@ -159,11 +210,11 @@ function QuizPage() {
 
             <div className="mt-10 rounded-2xl border bg-card p-7 shadow-card">
               <div className="text-xs text-primary font-medium uppercase tracking-widest mb-3">{topic} · {diff}</div>
-              <h2 className="font-display text-2xl font-semibold leading-snug">{current.q}</h2>
+              <h2 className="font-display text-2xl font-semibold leading-snug">{current.question}</h2>
 
               <div className="mt-6 space-y-2.5">
-                {current.opts.map((opt, i) => {
-                  const isCorrect = i === current.answer;
+                {current.options.map((opt, i) => {
+                  const isCorrect = i === current.correct_index;
                   const isSelected = selected === i;
                   const showResult = selected !== null;
                   return (
@@ -200,7 +251,7 @@ function QuizPage() {
                     className="overflow-hidden"
                   >
                     <div className="mt-5 rounded-xl bg-secondary p-4 text-sm">
-                      <span className="font-medium">Explanation: </span>{current.explain}
+                      <span className="font-medium">Explanation: </span>{current.explanation}
                     </div>
                   </motion.div>
                 )}
@@ -236,7 +287,7 @@ function QuizPage() {
             </div>
 
             <div className="mt-8 flex justify-center gap-2">
-              <button onClick={start} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium hover:bg-secondary transition">
+              <button onClick={retry} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium hover:bg-secondary transition">
                 <RotateCcw className="h-4 w-4" /> Retry
               </button>
               <button onClick={reset} className="inline-flex items-center gap-2 rounded-xl bg-foreground text-background px-4 py-2.5 text-sm font-medium hover:opacity-90 transition">
