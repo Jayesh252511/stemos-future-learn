@@ -14,7 +14,156 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      achievements: {
+        Row: {
+          badge_key: string
+          badge_label: string
+          id: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          badge_key: string
+          badge_label: string
+          id?: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          badge_key?: string
+          badge_label?: string
+          id?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_history: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json
+          subject: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          subject?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          subject?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      learning_progress: {
+        Row: {
+          id: string
+          lessons_completed: number
+          mastery_pct: number
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          lessons_completed?: number
+          mastery_pct?: number
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          lessons_completed?: number
+          mastery_pct?: number
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          current_streak: number
+          display_name: string | null
+          id: string
+          last_activity_date: string | null
+          total_xp: number
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          current_streak?: number
+          display_name?: string | null
+          id: string
+          last_activity_date?: string | null
+          total_xp?: number
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          current_streak?: number
+          display_name?: string | null
+          id?: string
+          last_activity_date?: string | null
+          total_xp?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      quiz_attempts: {
+        Row: {
+          created_at: string
+          difficulty: string
+          duration_seconds: number | null
+          id: string
+          score: number
+          subject: string
+          total_questions: number
+          user_id: string
+          xp_earned: number
+        }
+        Insert: {
+          created_at?: string
+          difficulty: string
+          duration_seconds?: number | null
+          id?: string
+          score: number
+          subject: string
+          total_questions: number
+          user_id: string
+          xp_earned?: number
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string
+          duration_seconds?: number | null
+          id?: string
+          score?: number
+          subject?: string
+          total_questions?: number
+          user_id?: string
+          xp_earned?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
