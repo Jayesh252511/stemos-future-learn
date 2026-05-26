@@ -1,5 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { AuthShell, AuthInput, SocialButtons } from "@/components/site/AuthShell";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { AuthShell, AuthInput } from "@/components/site/AuthShell";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -12,26 +16,58 @@ export const Route = createFileRoute("/signup")({
 });
 
 function SignUp() {
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setLoading(true);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+        data: { display_name: name },
+      },
+    });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    if (data.session) {
+      toast.success("Account created!");
+      navigate({ to: "/dashboard" });
+    } else {
+      toast.success("Check your email to confirm your account.");
+      navigate({ to: "/signin" });
+    }
+  };
+
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Join 120,000+ students learning STEM the smart way."
+      subtitle="Start learning STEM with your personal AI tutor."
       footer={<>Already have an account? <Link to="/signin" className="text-foreground font-medium hover:underline">Sign in</Link></>}
     >
-      <form className="space-y-4">
-        <SocialButtons />
-        <div className="relative my-2">
-          <div className="h-px bg-border" />
-          <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-card px-2 text-[10px] uppercase tracking-widest text-muted-foreground">or</span>
-        </div>
-        <AuthInput label="Full name" placeholder="Ananya Rao" />
-        <AuthInput label="Email" type="email" placeholder="you@university.edu" />
-        <AuthInput label="Password" type="password" placeholder="At least 8 characters" />
-        <p className="text-[11px] text-muted-foreground">
-          By signing up, you agree to our <a href="#" className="underline">Terms</a> and <a href="#" className="underline">Privacy Policy</a>.
-        </p>
-        <button type="submit" className="w-full rounded-xl bg-gradient-hero text-primary-foreground py-2.5 text-sm font-medium hover:opacity-95 transition shadow-glow">
-          Create free account
+      <form className="space-y-4" onSubmit={submit}>
+        <AuthInput label="Name" placeholder="Ada Lovelace" value={name} onChange={setName} required />
+        <AuthInput label="Email" type="email" placeholder="you@university.edu" value={email} onChange={setEmail} required />
+        <AuthInput label="Password" type="password" placeholder="At least 6 characters" value={password} onChange={setPassword} required />
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-foreground text-background py-2.5 text-sm font-medium hover:opacity-90 transition shadow-soft disabled:opacity-60"
+        >
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          Create account
         </button>
       </form>
     </AuthShell>

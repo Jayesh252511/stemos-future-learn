@@ -1,5 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { AuthShell, AuthInput, SocialButtons } from "@/components/site/AuthShell";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { AuthShell, AuthInput } from "@/components/site/AuthShell";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/signin")({
   head: () => ({
@@ -12,27 +16,39 @@ export const Route = createFileRoute("/signin")({
 });
 
 function SignIn() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Welcome back!");
+    navigate({ to: "/dashboard" });
+  };
+
   return (
     <AuthShell
       title="Welcome back"
       subtitle="Sign in to pick up where you left off."
       footer={<>Don't have an account? <Link to="/signup" className="text-foreground font-medium hover:underline">Sign up</Link></>}
     >
-      <form className="space-y-4">
-        <SocialButtons />
-        <div className="relative my-2">
-          <div className="h-px bg-border" />
-          <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-card px-2 text-[10px] uppercase tracking-widest text-muted-foreground">or</span>
-        </div>
-        <AuthInput label="Email" type="email" placeholder="you@university.edu" />
-        <AuthInput label="Password" type="password" placeholder="••••••••" />
-        <div className="flex items-center justify-between text-xs">
-          <label className="inline-flex items-center gap-1.5 text-muted-foreground">
-            <input type="checkbox" className="rounded border" /> Remember me
-          </label>
-          <a href="#" className="text-muted-foreground hover:text-foreground">Forgot password?</a>
-        </div>
-        <button type="submit" className="w-full rounded-xl bg-foreground text-background py-2.5 text-sm font-medium hover:opacity-90 transition shadow-soft">
+      <form className="space-y-4" onSubmit={submit}>
+        <AuthInput label="Email" type="email" placeholder="you@university.edu" value={email} onChange={(v) => setEmail(v)} required />
+        <AuthInput label="Password" type="password" placeholder="••••••••" value={password} onChange={(v) => setPassword(v)} required />
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-foreground text-background py-2.5 text-sm font-medium hover:opacity-90 transition shadow-soft disabled:opacity-60"
+        >
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
           Sign in
         </button>
       </form>
