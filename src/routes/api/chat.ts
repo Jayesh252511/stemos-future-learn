@@ -1,21 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const SYSTEM = `You are STEMOS, an expert AI tutor for STEM students (Math, Physics, Chemistry, Biology, Programming).
+const BASE_SYSTEM = `You are STEMOS, an expert, highly encouraging AI tutor for Gen-Z STEM students (Math, Physics, Chemistry, Biology, Programming).
 
-Your style:
-- Explain step by step, in a friendly, encouraging tone.
-- Use clear markdown: **bold** for key terms, numbered steps, fenced code blocks for code, and LaTeX-style notation when helpful.
-- Start with the core intuition before diving into formulas.
-- End with a short check-for-understanding question or suggested next step.
-- Keep answers concise but complete. Never invent facts; if unsure, say so.`;
+Your personality:
+- Intelligent, modern, supportive, motivating, emotionally engaging, and student-friendly.
+- Use a relatable, subtly Gen-Z tone: "You're cooking this 🍳", "Let's break this down step-by-step.", "Locked in mode 🧠", "You're actually getting this fast."
+- Do NOT spam slang or act immature. Keep it professional but highly motivating and conversational.
+- Explain step-by-step, starting with the core intuition before diving into formulas.
+- If a student gets something right, celebrate it (e.g. "Brain XP upgraded 🚀", "Lowkey mastering this").
+- Format code elegantly with markdown fences, and suggest a smart next step.
+- Never invent facts; if unsure, say so clearly.`;
 
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { messages } = (await request.json()) as {
+          const { messages, locale } = (await request.json()) as {
             messages: { role: "user" | "assistant"; content: string }[];
+            locale?: string;
           };
 
           if (!Array.isArray(messages) || messages.length === 0) {
@@ -25,32 +28,64 @@ export const Route = createFileRoute("/api/chat")({
             });
           }
 
-          const apiKey = process.env.LOVABLE_API_KEY;
+          const apiKey = process.env.GROQ_API_KEY || process.env.TUTOR_API_KEY || process.env.OPENAI_API_KEY;
           if (!apiKey) {
-            return new Response(JSON.stringify({ error: "AI not configured" }), {
+            return new Response(JSON.stringify({ error: "Groq API key not configured. Please add GROQ_API_KEY to your .env file." }), {
               status: 500,
               headers: { "Content-Type": "application/json" },
             });
           }
 
-          const upstream = await fetch(
-            "https://ai.gateway.lovable.dev/v1/chat/completions",
-            {
+          // Build localized system prompt
+          const langInstruction = locale && locale !== "en"
+            ? `\n\nLANGUAGE RULE (CRITICAL): You MUST respond ONLY in ${locale}. All explanations, examples, and text must be in ${locale}. Do NOT switch to English under any circumstances. Keep technical terms (like variable names, math symbols) in their universal form, but all natural language MUST be in ${locale}.`
+            : "";
+
+          const SYSTEM = BASE_SYSTEM + langInstruction;
+
+          const baseUrl = process.env.TUTOR_BASE_URL || "https://api.groq.com/openai/v1/chat/completions";
+          const primaryModel = process.env.TUTOR_MODEL || "llama-3.1-8b-instant";
+          const fallbackModel = "llama-3.3-70b-versatile";
+
+          let upstream: Response;
+          try {
+            upstream = await fetch(baseUrl, {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                model: "google/gemini-3-flash-preview",
+                model: primaryModel,
                 stream: true,
                 messages: [
                   { role: "system", content: SYSTEM },
                   ...messages.slice(-20),
                 ],
               }),
-            },
-          );
+            });
+
+            if (!upstream.ok) {
+              throw new Error(`Primary model returned status ${upstream.status}`);
+            }
+          } catch (e) {
+            console.warn(`Primary model (${primaryModel}) failed. Retrying with fallback (${fallbackModel})...`, e);
+            upstream = await fetch(baseUrl, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: fallbackModel,
+                stream: true,
+                messages: [
+                  { role: "system", content: SYSTEM },
+                  ...messages.slice(-20),
+                ],
+              }),
+            });
+          }
 
           if (!upstream.ok) {
             if (upstream.status === 429) {
@@ -61,13 +96,13 @@ export const Route = createFileRoute("/api/chat")({
             }
             if (upstream.status === 402) {
               return new Response(
-                JSON.stringify({ error: "AI credits exhausted. Add credits in your Lovable workspace." }),
+                JSON.stringify({ error: "Tutor service limits or credits exhausted." }),
                 { status: 402, headers: { "Content-Type": "application/json" } },
               );
             }
             const t = await upstream.text();
-            console.error("AI gateway error", upstream.status, t);
-            return new Response(JSON.stringify({ error: "AI gateway error" }), {
+            console.error("Tutor upstream error", upstream.status, t);
+            return new Response(JSON.stringify({ error: "Tutor service error" }), {
               status: 500,
               headers: { "Content-Type": "application/json" },
             });

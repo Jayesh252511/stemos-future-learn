@@ -13,11 +13,16 @@ import { Route as TutorRouteImport } from './routes/tutor'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
+import { Route as ShopRouteImport } from './routes/shop'
 import { Route as QuizRouteImport } from './routes/quiz'
 import { Route as PathsRouteImport } from './routes/paths'
+import { Route as LabRouteImport } from './routes/lab'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ArenaRouteImport } from './routes/arena'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiQuizRouteImport } from './routes/api/quiz'
+import { Route as ApiModerateChatRouteImport } from './routes/api/moderate-chat'
+import { Route as ApiGeneratePathRouteImport } from './routes/api/generate-path'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
 const TutorRoute = TutorRouteImport.update({
@@ -40,6 +45,11 @@ const SigninRoute = SigninRouteImport.update({
   path: '/signin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShopRoute = ShopRouteImport.update({
+  id: '/shop',
+  path: '/shop',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const QuizRoute = QuizRouteImport.update({
   id: '/quiz',
   path: '/quiz',
@@ -50,9 +60,19 @@ const PathsRoute = PathsRouteImport.update({
   path: '/paths',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabRoute = LabRouteImport.update({
+  id: '/lab',
+  path: '/lab',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArenaRoute = ArenaRouteImport.update({
+  id: '/arena',
+  path: '/arena',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -65,6 +85,16 @@ const ApiQuizRoute = ApiQuizRouteImport.update({
   path: '/api/quiz',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiModerateChatRoute = ApiModerateChatRouteImport.update({
+  id: '/api/moderate-chat',
+  path: '/api/moderate-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGeneratePathRoute = ApiGeneratePathRouteImport.update({
+  id: '/api/generate-path',
+  path: '/api/generate-path',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -73,90 +103,125 @@ const ApiChatRoute = ApiChatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/arena': typeof ArenaRoute
   '/dashboard': typeof DashboardRoute
+  '/lab': typeof LabRoute
   '/paths': typeof PathsRoute
   '/quiz': typeof QuizRoute
+  '/shop': typeof ShopRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tutor': typeof TutorRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/generate-path': typeof ApiGeneratePathRoute
+  '/api/moderate-chat': typeof ApiModerateChatRoute
   '/api/quiz': typeof ApiQuizRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/arena': typeof ArenaRoute
   '/dashboard': typeof DashboardRoute
+  '/lab': typeof LabRoute
   '/paths': typeof PathsRoute
   '/quiz': typeof QuizRoute
+  '/shop': typeof ShopRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tutor': typeof TutorRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/generate-path': typeof ApiGeneratePathRoute
+  '/api/moderate-chat': typeof ApiModerateChatRoute
   '/api/quiz': typeof ApiQuizRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/arena': typeof ArenaRoute
   '/dashboard': typeof DashboardRoute
+  '/lab': typeof LabRoute
   '/paths': typeof PathsRoute
   '/quiz': typeof QuizRoute
+  '/shop': typeof ShopRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tutor': typeof TutorRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/generate-path': typeof ApiGeneratePathRoute
+  '/api/moderate-chat': typeof ApiModerateChatRoute
   '/api/quiz': typeof ApiQuizRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/arena'
     | '/dashboard'
+    | '/lab'
     | '/paths'
     | '/quiz'
+    | '/shop'
     | '/signin'
     | '/signup'
     | '/sitemap.xml'
     | '/tutor'
     | '/api/chat'
+    | '/api/generate-path'
+    | '/api/moderate-chat'
     | '/api/quiz'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/arena'
     | '/dashboard'
+    | '/lab'
     | '/paths'
     | '/quiz'
+    | '/shop'
     | '/signin'
     | '/signup'
     | '/sitemap.xml'
     | '/tutor'
     | '/api/chat'
+    | '/api/generate-path'
+    | '/api/moderate-chat'
     | '/api/quiz'
   id:
     | '__root__'
     | '/'
+    | '/arena'
     | '/dashboard'
+    | '/lab'
     | '/paths'
     | '/quiz'
+    | '/shop'
     | '/signin'
     | '/signup'
     | '/sitemap.xml'
     | '/tutor'
     | '/api/chat'
+    | '/api/generate-path'
+    | '/api/moderate-chat'
     | '/api/quiz'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArenaRoute: typeof ArenaRoute
   DashboardRoute: typeof DashboardRoute
+  LabRoute: typeof LabRoute
   PathsRoute: typeof PathsRoute
   QuizRoute: typeof QuizRoute
+  ShopRoute: typeof ShopRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TutorRoute: typeof TutorRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiGeneratePathRoute: typeof ApiGeneratePathRoute
+  ApiModerateChatRoute: typeof ApiModerateChatRoute
   ApiQuizRoute: typeof ApiQuizRoute
 }
 
@@ -190,6 +255,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SigninRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shop': {
+      id: '/shop'
+      path: '/shop'
+      fullPath: '/shop'
+      preLoaderRoute: typeof ShopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/quiz': {
       id: '/quiz'
       path: '/quiz'
@@ -204,11 +276,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PathsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lab': {
+      id: '/lab'
+      path: '/lab'
+      fullPath: '/lab'
+      preLoaderRoute: typeof LabRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/arena': {
+      id: '/arena'
+      path: '/arena'
+      fullPath: '/arena'
+      preLoaderRoute: typeof ArenaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -225,6 +311,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiQuizRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/moderate-chat': {
+      id: '/api/moderate-chat'
+      path: '/api/moderate-chat'
+      fullPath: '/api/moderate-chat'
+      preLoaderRoute: typeof ApiModerateChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/generate-path': {
+      id: '/api/generate-path'
+      path: '/api/generate-path'
+      fullPath: '/api/generate-path'
+      preLoaderRoute: typeof ApiGeneratePathRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -237,16 +337,31 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArenaRoute: ArenaRoute,
   DashboardRoute: DashboardRoute,
+  LabRoute: LabRoute,
   PathsRoute: PathsRoute,
   QuizRoute: QuizRoute,
+  ShopRoute: ShopRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TutorRoute: TutorRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiGeneratePathRoute: ApiGeneratePathRoute,
+  ApiModerateChatRoute: ApiModerateChatRoute,
   ApiQuizRoute: ApiQuizRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { AuthShell, AuthInput } from "@/components/site/AuthShell";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { useLanguage } from "@/lib/i18n";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -16,11 +18,27 @@ export const Route = createFileRoute("/signup")({
 });
 
 function SignUp() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate({ to: "/dashboard" });
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +46,7 @@ function SignUp() {
       toast.error("Password must be at least 6 characters");
       return;
     }
-    setLoading(true);
+    setLoadingSubmit(true);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -37,7 +55,7 @@ function SignUp() {
         data: { display_name: name },
       },
     });
-    setLoading(false);
+    setLoadingSubmit(false);
     if (error) {
       toast.error(error.message);
       return;
@@ -53,21 +71,21 @@ function SignUp() {
 
   return (
     <AuthShell
-      title="Create your account"
-      subtitle="Start learning STEM with your personal AI tutor."
-      footer={<>Already have an account? <Link to="/signin" className="text-foreground font-medium hover:underline">Sign in</Link></>}
+      title={t("createAccount")}
+      subtitle={t("signUpSubtitle")}
+      footer={<>{t("alreadyHaveAccount")} <Link to="/signin" className="text-foreground font-medium hover:underline">{t("signIn")}</Link></>}
     >
       <form className="space-y-4" onSubmit={submit}>
-        <AuthInput label="Name" placeholder="Ada Lovelace" value={name} onChange={setName} required />
-        <AuthInput label="Email" type="email" placeholder="you@university.edu" value={email} onChange={setEmail} required />
-        <AuthInput label="Password" type="password" placeholder="At least 6 characters" value={password} onChange={setPassword} required />
+        <AuthInput label={t("nameLabel")} placeholder="Ada Lovelace" value={name} onChange={setName} required />
+        <AuthInput label={t("emailLabel")} type="email" placeholder="you@university.edu" value={email} onChange={setEmail} required />
+        <AuthInput label={t("passwordLabel")} type="password" placeholder="At least 6 characters" value={password} onChange={setPassword} required />
         <button
           type="submit"
-          disabled={loading}
+          disabled={loadingSubmit}
           className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-foreground text-background py-2.5 text-sm font-medium hover:opacity-90 transition shadow-soft disabled:opacity-60"
         >
-          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-          Create account
+          {loadingSubmit && <Loader2 className="h-4 w-4 animate-spin" />}
+          {t("createAccount")}
         </button>
       </form>
     </AuthShell>

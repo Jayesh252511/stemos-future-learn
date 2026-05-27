@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { Sparkles, Github, Twitter, Linkedin } from "lucide-react";
+import { useFooterLanguage } from "@/lib/i18n-footer";
 
 export function Footer() {
+  const { tf } = useFooterLanguage();
   return (
     <footer className="border-t mt-32">
       <div className="mx-auto max-w-7xl px-6 py-16 grid gap-12 md:grid-cols-5">
@@ -13,7 +15,7 @@ export function Footer() {
             <span className="font-display text-lg font-semibold">STEMOS</span>
           </div>
           <p className="mt-4 text-sm text-muted-foreground max-w-xs">
-            The AI-powered learning operating system for the next generation of STEM students.
+            {tf("description")}
           </p>
           <div className="flex gap-3 mt-6">
             {[Twitter, Github, Linkedin].map((Icon, i) => (
@@ -25,9 +27,9 @@ export function Footer() {
         </div>
 
         {[
-          { title: "Product", links: [["AI Tutor", "/tutor"], ["Quizzes", "/quiz"], ["Learning Paths", "/paths"], ["Dashboard", "/dashboard"]] },
-          { title: "Subjects", links: [["Mathematics", "/paths"], ["Physics", "/paths"], ["Chemistry", "/paths"], ["Programming", "/paths"]] },
-          { title: "Company", links: [["About", "#"], ["Careers", "#"], ["Pricing", "/#pricing"], ["Contact", "#"]] },
+          { title: tf("product"), links: [["AI Tutor", "/tutor"], ["Quizzes", "/quiz"], ["Learning Paths", "/paths"], ["Dashboard", "/dashboard"]] },
+          { title: tf("subjects"), links: [["Mathematics", "/paths"], ["Physics", "/paths"], ["Chemistry", "/paths"], ["Programming", "/paths"]] },
+          { title: tf("company"), links: [[tf("about"), "#"], [tf("careers"), "#"], [tf("pricing"), "/#pricing"], [tf("contact"), "#"]] },
         ].map((col) => (
           <div key={col.title}>
             <h4 className="text-sm font-semibold mb-4">{col.title}</h4>
@@ -43,8 +45,8 @@ export function Footer() {
       </div>
       <div className="border-t">
         <div className="mx-auto max-w-7xl px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">© 2026 STEMOS Inc. All rights reserved.</p>
-          <p className="text-xs text-muted-foreground">Built for curious minds.</p>
+          <p className="text-xs text-muted-foreground">{tf("rights")}</p>
+          <p className="text-xs text-muted-foreground">{tf("builtFor")}</p>
         </div>
       </div>
     </footer>

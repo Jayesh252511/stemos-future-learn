@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Toaster } from "sonner";
+import { LanguageProvider } from "@/lib/i18n";
 
 import appCss from "../styles.css?url";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,10 +46,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <p className="text-muted-foreground mb-6">Something went wrong on our end. You can try refreshing or head back home.</p>
+        <div className="bg-red-500/10 text-red-500 text-left p-4 rounded-md mb-6 text-xs font-mono overflow-auto max-w-full">
+          <strong>{error.message}</strong>
+          <pre className="mt-2 whitespace-pre-wrap">{error.stack}</pre>
+        </div>
+        <div className="flex items-center justify-center gap-3">
           <button
             onClick={() => {
               router.invalidate();
@@ -76,17 +79,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "STEMOS — The Future of STEM Learning" },
-      { name: "description", content: "AI-powered personalized STEM learning platform for Math, Physics, Chemistry, and Programming." },
+      { name: "description", content: "Smart personalized STEM learning platform for Math, Physics, Chemistry, and Programming." },
       { name: "author", content: "STEMOS" },
       { property: "og:title", content: "STEMOS — The Future of STEM Learning" },
-      { property: "og:description", content: "AI-powered personalized STEM learning platform for Math, Physics, Chemistry, and Programming." },
+      { property: "og:description", content: "Smart personalized STEM learning platform for Math, Physics, Chemistry, and Programming." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@stemos" },
       { name: "twitter:title", content: "STEMOS — The Future of STEM Learning" },
-      { name: "twitter:description", content: "AI-powered personalized STEM learning platform for Math, Physics, Chemistry, and Programming." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d6e81a92-84db-4aab-a633-2f37ded15446/id-preview-29e44c2b--10c14ad6-5b93-4acc-a2d5-f005b37ff0c3.lovable.app-1779780533188.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d6e81a92-84db-4aab-a633-2f37ded15446/id-preview-29e44c2b--10c14ad6-5b93-4acc-a2d5-f005b37ff0c3.lovable.app-1779780533188.png" },
+      { name: "twitter:description", content: "Smart personalized STEM learning platform for Math, Physics, Chemistry, and Programming." },
+      { property: "og:image", content: "/og-image.png" },
+      { name: "twitter:image", content: "/og-image.png" },
     ],
     links: [
       {
@@ -132,10 +135,12 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthSync />
-      <Outlet />
-      <Toaster position="top-right" richColors closeButton />
-    </QueryClientProvider>
+    <LanguageProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthSync />
+        <Outlet />
+        <Toaster position="top-right" richColors closeButton />
+      </QueryClientProvider>
+    </LanguageProvider>
   );
 }

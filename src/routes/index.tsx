@@ -1,325 +1,477 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Sparkles, BrainCircuit, Atom, FlaskConical, Code2, Sigma,
-  Zap, Trophy, BarChart3, Check, Star, GraduationCap, BookOpen, Target
+  Zap, Trophy, BarChart3, Check, Star, GraduationCap, BookOpen, Target,
+  Flame, Users, MessageSquare, Play, ChevronRight, MessageCircle
 } from "lucide-react";
 import { Layout } from "@/components/site/Layout";
+import { useAuth } from "@/hooks/use-auth";
+import { useState, useEffect } from "react";
+import { useLanguage } from "@/lib/i18n";
+import { useIndexLanguage } from "@/lib/i18n-index";
+import { DoodleAtom, DoodleRocket, DoodleStar, DoodleFlask, DoodleFormula, DoodleArrow, DoodleUnderline, DoodleScribble, DoodleLightbulb, DoodleCode, DoodleNeural, DoodleZigzag } from "@/components/site/Doodles";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "STEMOS — The Future of STEM Learning" },
-      { name: "description", content: "AI-powered personalized learning platform for Physics, Math, Chemistry, and Programming. Built for the next generation of curious minds." },
-      { property: "og:title", content: "STEMOS — The Future of STEM Learning" },
-      { property: "og:description", content: "AI-powered personalized learning for Physics, Math, Chemistry, and Programming." },
+      { name: "description", content: "A futuristic creative learning studio for the next generation of curious minds." },
     ],
   }),
   component: Index,
 });
 
-const subjects = [
-  { icon: Sigma, name: "Mathematics", color: "from-indigo-500 to-violet-500" },
-  { icon: Atom, name: "Physics", color: "from-cyan-500 to-blue-500" },
-  { icon: FlaskConical, name: "Chemistry", color: "from-fuchsia-500 to-purple-500" },
-  { icon: Code2, name: "Programming", color: "from-emerald-500 to-teal-500" },
-];
+function TypewriterLoop({ words }: { words: string[] }) {
+  const [index, setIndex] = useState(0);
+  const [subIndex, setSubIndex] = useState(0);
+  const [reverse, setReverse] = useState(false);
+
+  // Typewriter effect
+  useEffect(() => {
+    if (subIndex === words[index].length + 1 && !reverse) {
+      const timeout = setTimeout(() => setReverse(true), 1500);
+      return () => clearTimeout(timeout);
+    }
+
+    if (subIndex === 0 && reverse) {
+      setReverse(false);
+      setIndex((prev) => (prev + 1) % words.length);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setSubIndex((prev) => prev + (reverse ? -1 : 1));
+    }, Math.max(reverse ? 50 : 100, Math.random() * 150));
+
+    return () => clearTimeout(timeout);
+  }, [subIndex, index, reverse, words]);
+
+  return (
+    <div className="font-mono text-sm font-medium text-emerald-500 h-6 flex items-center">
+      {`> ${words[index].substring(0, subIndex)}`}
+      <motion.span
+        animate={{ opacity: [1, 0] }}
+        transition={{ repeat: Infinity, duration: 0.8 }}
+        className="w-2 h-4 bg-emerald-500 ml-1 inline-block"
+      />
+    </div>
+  );
+}
+
+function DashCard({ title, value, suffix = "", icon: Icon, accent }: { title: string, value: string, suffix?: string, icon: any, accent: string }) {
+  return (
+    <div className="rounded-xl border bg-card p-5 relative overflow-hidden group">
+      <div className={`absolute right-0 top-0 h-16 w-16 -mr-6 -mt-6 rounded-full bg-gradient-to-br opacity-20 blur-2xl transition duration-500 group-hover:scale-150 ${accent}`} />
+      <div className="flex items-center justify-between mb-4 relative">
+        <div className="text-sm font-medium text-muted-foreground">{title}</div>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <div className="flex items-baseline gap-1.5 relative">
+        <div className="text-2xl font-bold tracking-tight">{value}</div>
+        {suffix && <div className="text-xs text-muted-foreground font-medium">{suffix}</div>}
+      </div>
+    </div>
+  );
+}
 
 function Index() {
+  const { user } = useAuth();
+  const { t } = useLanguage();
+  const { ti } = useIndexLanguage();
+  
+  const [chatDemo, setChatDemo] = useState(0);
+  const chatDemoMessages = [
+    { role: "user", msg: "Explain quantum entanglement like I'm 10." },
+    { role: "ai", msg: "Imagine you have a pair of magical dice. If you roll a 6 on one die in New York, the other die in Tokyo instantly rolls a 6 too! They share a hidden connection, no matter how far apart they are. 🎲✨" },
+  ];
+
+  useEffect(() => {
+    if (chatDemo >= chatDemoMessages.length - 1) return;
+    const t = setTimeout(() => setChatDemo((i) => i + 1), 2000);
+    return () => clearTimeout(t);
+  }, [chatDemo]);
+
   return (
     <Layout>
-      {/* HERO */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-mesh" />
-        <div className="absolute inset-0 grid-pattern opacity-40 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
-        <div className="relative mx-auto max-w-7xl px-6 pt-24 pb-20 md:pt-32 md:pb-28">
+      {/* 1. HERO - Asymmetrical Handcrafted Workspace */}
+      <section className="relative overflow-hidden min-h-[90vh] flex items-center pt-24 pb-20">
+        <div className="absolute inset-0 bg-gradient-mesh opacity-80" />
+        <div className="absolute inset-0 grid-pattern opacity-30 [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
+        
+        {/* Floating Doodles Background */}
+        <DoodleFormula className="hidden md:block absolute top-32 left-10 text-primary" size={100} opacity={0.2} />
+        <DoodleRocket className="hidden md:block absolute bottom-40 right-20 text-violet-500" size={80} opacity={0.15} />
+        <DoodleStar className="hidden md:block absolute top-1/2 left-1/4 text-amber-500" size={50} opacity={0.25} />
+        <DoodleLightbulb className="hidden md:block absolute top-20 right-1/4 text-yellow-500" size={70} opacity={0.2} />
+        <DoodleZigzag className="hidden md:block absolute bottom-24 left-1/3 text-emerald-500" size={60} opacity={0.15} />
+        
+        <div className="relative mx-auto max-w-7xl px-6 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex flex-col items-center text-center"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}
+            className="flex flex-col items-start text-left relative z-10"
           >
-            <div className="inline-flex items-center gap-2 rounded-full border bg-surface/60 backdrop-blur px-3 py-1.5 text-xs text-muted-foreground shadow-soft">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 animate-ping" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-              </span>
-              Introducing STEMOS 2.0 — Now with AI Tutor
-              <ArrowRight className="h-3 w-3" />
+            <div className="inline-flex items-center gap-2 rounded-full border bg-yellow-100/10 backdrop-blur px-3 py-1.5 text-xs text-yellow-500 font-medium mb-6 shadow-soft -rotate-1">
+              <Star className="h-3.5 w-3.5 fill-current" />
+              {ti("tagline")}
             </div>
-
-            <h1 className="mt-8 font-display text-5xl md:text-7xl font-semibold tracking-tight max-w-4xl leading-[1.05]">
-              The Future of <span className="text-gradient">STEM Learning</span>
+            
+            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.1] relative">
+              <span className="relative z-10">Think.</span><br />
+              <span className="relative z-10 text-gradient">Explore.</span><br />
+              <span className="relative z-10">Master.</span>
+              <DoodleUnderline className="absolute -bottom-4 left-0 text-primary w-full max-w-[200px]" opacity={0.4} />
             </h1>
-            <p className="mt-6 max-w-2xl text-lg text-muted-foreground leading-relaxed">
-              An AI-powered learning operating system that adapts to how you think. Master Math, Physics,
-              Chemistry, and Programming with personalized tutoring, smart quizzes, and roadmaps built for mastery.
+            
+            <p className="mt-8 max-w-lg text-lg text-muted-foreground leading-relaxed">
+              {t("heroSub")}
             </p>
 
-            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <Link to="/signup" className="group inline-flex items-center gap-2 rounded-xl bg-foreground text-background px-5 py-3 text-sm font-medium shadow-soft hover:opacity-90 transition">
-                Start Learning
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <Link to={user ? "/dashboard" : "/signup"} className="group relative inline-flex items-center gap-2 rounded-xl bg-foreground text-background px-6 py-3.5 text-sm font-medium shadow-soft hover:-translate-y-0.5 transition-all">
+                {user ? t("goToDashboard") : t("startLearning")}
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
               </Link>
-              <Link to="/tutor" className="inline-flex items-center gap-2 rounded-xl border bg-surface px-5 py-3 text-sm font-medium hover:bg-secondary transition shadow-soft">
-                <Sparkles className="h-4 w-4 text-primary" />
-                Try AI Tutor
+              <Link to="/tutor" className="group inline-flex items-center gap-2 rounded-xl border bg-surface px-6 py-3.5 text-sm font-medium hover:bg-secondary transition shadow-soft">
+                <Play className="h-4 w-4 text-primary fill-primary group-hover:scale-110 transition-transform" />
+                {t("tryAiTutor")}
               </Link>
             </div>
-
-            <p className="mt-5 text-xs text-muted-foreground">No credit card required · Free for students</p>
+            
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+              className="mt-6 flex items-center gap-2 text-xs text-muted-foreground"
+            >
+              <DoodleArrow className="text-muted-foreground -ml-4" size={40} opacity={0.3} />
+              <span>{t("noCardRequired")}</span>
+            </motion.div>
           </motion.div>
 
-          {/* Dashboard mockup */}
           <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
-            className="relative mt-20 mx-auto max-w-5xl"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="relative lg:h-[600px] flex items-center justify-center"
           >
-            <div className="absolute -inset-x-8 -inset-y-6 bg-gradient-hero opacity-20 blur-3xl rounded-[3rem]" />
-            <div className="relative rounded-2xl border bg-surface shadow-card overflow-hidden">
-              <div className="flex items-center gap-2 border-b px-4 py-2.5 bg-surface-elevated">
-                <div className="flex gap-1.5">
-                  <div className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-yellow-400/70" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-green-400/70" />
+            {/* The Notebook / Workspace Canvas */}
+            <div className="absolute inset-0 bg-gradient-hero opacity-20 blur-3xl rounded-[3rem]" />
+            
+            <div className="relative w-full max-w-md aspect-[4/5] bg-surface rounded-2xl border shadow-card p-6 rotate-2 hover:rotate-1 transition-transform duration-500">
+              {/* Paper styling */}
+              <div className="absolute top-0 bottom-0 left-6 w-px bg-red-500/20" />
+              <div className="space-y-6 pt-4 pl-4 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-violet-500/20 flex items-center justify-center">
+                    <Sigma className="h-5 w-5 text-violet-500" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold font-mono">Calculus.ts</div>
+                    <div className="text-xs text-muted-foreground">in progress...</div>
+                  </div>
                 </div>
-                <div className="ml-3 text-[11px] text-muted-foreground">stemos.app/dashboard</div>
+                
+                <div className="space-y-4 bg-secondary/10 p-4 rounded-xl border border-secondary/50">
+                  <TypewriterLoop words={["bro is locked in 🧠", "cooked the midterm 🔥", "zero cap learning 🧢", "brain xp loaded 🚀"]} />
+                  <div className="h-2 w-3/4 rounded-md bg-secondary/80" />
+                  <div className="h-2 w-1/2 rounded-md bg-secondary/80" />
+                </div>
+                
+                <div className="mt-8 p-4 rounded-xl border bg-card/50 shadow-sm transform -rotate-2 relative">
+                   <div className="absolute -top-3 -right-3 h-6 w-6 bg-red-400 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm">1</div>
+                   <div className="text-xs font-medium text-foreground mb-1">New insight!</div>
+                   <div className="text-xs text-muted-foreground">Integrals are just fancy addition.</div>
+                </div>
               </div>
-              <div className="grid md:grid-cols-3 gap-4 p-5">
-                <DashCard title="Learning streak" value="42" suffix="days" icon={Zap} accent="from-amber-400 to-orange-500" />
-                <DashCard title="XP earned" value="12,840" icon={Trophy} accent="from-violet-400 to-fuchsia-500" />
-                <DashCard title="Lessons" value="187" suffix="completed" icon={BookOpen} accent="from-cyan-400 to-blue-500" />
-                <div className="md:col-span-2 rounded-xl border bg-card p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div className="text-sm font-medium">Weekly progress</div>
-                      <div className="text-xs text-muted-foreground">Hours studied across subjects</div>
-                    </div>
-                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              
+              {/* Overlapping Sticky Note */}
+              <motion.div 
+                whileHover={{ scale: 1.05, rotate: -2 }}
+                className="absolute -right-2 -bottom-4 md:-right-6 md:-bottom-6 w-40 md:w-48 aspect-square bg-yellow-200/90 backdrop-blur rounded-br-2xl rounded-tl-sm shadow-xl p-3 md:p-4 transform rotate-6 border border-yellow-300 will-change-transform"
+              >
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 md:w-12 h-2 md:h-3 bg-red-500/10 rounded-full" />
+                <div className="mt-3 md:mt-4 text-yellow-900 font-medium text-xs md:text-sm leading-relaxed">
+                  "Don't just memorize formulas. Understand why they exist."
+                </div>
+                <div className="mt-1 md:mt-2 text-yellow-800/60 text-[10px] md:text-xs font-mono">- Feynman</div>
+              </motion.div>
+            </div>
+            
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 2. STORY 1: Learning is broken */}
+      <section className="py-16 md:py-24 relative overflow-hidden bg-background">
+        <DoodleScribble className="hidden md:block absolute top-0 right-10 text-muted-foreground" size={150} opacity={0.1} />
+        <DoodleZigzag className="hidden md:block absolute bottom-10 left-10 text-rose-500" size={90} opacity={0.15} />
+        <div className="mx-auto max-w-4xl px-6 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="space-y-6"
+          >
+            <h2 className="text-3xl md:text-5xl font-display font-semibold tracking-tight">
+              {ti("story1Title")}
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              {ti("story1Desc")}
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 3. STORY 2: How STEMOS adapts */}
+      <section className="py-16 md:py-24 bg-surface-elevated border-y relative overflow-hidden">
+        <DoodleNeural className="hidden md:block absolute top-10 right-10 text-cyan-500" size={120} opacity={0.1} />
+        <DoodleCode className="hidden md:block absolute bottom-20 left-10 text-emerald-500" size={90} opacity={0.1} />
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="order-2 md:order-1 relative"
+            >
+              <div className="absolute -inset-4 bg-gradient-to-tr from-cyan-500/10 to-blue-500/10 rounded-3xl blur-2xl" />
+              <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4 sm:pt-8">
+                  <div className="bg-card border rounded-2xl p-5 shadow-soft transform -rotate-2 hover:rotate-0 transition">
+                    <Atom className="h-6 w-6 text-cyan-500 mb-3" />
+                    <div className="font-medium text-sm">Physics</div>
+                    <div className="text-xs text-muted-foreground mt-1">Adaptive paths based on what you actually know.</div>
                   </div>
-                  <div className="flex items-end gap-2 h-32">
-                    {[55, 78, 42, 90, 65, 88, 72].map((h, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                        <div className="w-full rounded-md bg-gradient-to-t from-primary/30 to-primary/80" style={{ height: `${h}%` }} />
-                        <span className="text-[10px] text-muted-foreground">{["M","T","W","T","F","S","S"][i]}</span>
-                      </div>
-                    ))}
+                  <div className="bg-card border rounded-2xl p-5 shadow-soft transform rotate-1 hover:rotate-0 transition">
+                    <FlaskConical className="h-6 w-6 text-fuchsia-500 mb-3" />
+                    <div className="font-medium text-sm">Chemistry</div>
+                    <div className="text-xs text-muted-foreground mt-1">Interactive reaction sandbox.</div>
                   </div>
                 </div>
-                <div className="rounded-xl border bg-card p-5">
-                  <div className="text-sm font-medium mb-3">Up next</div>
-                  <div className="space-y-2.5">
-                    {[
-                      { t: "Quantum mechanics", s: "Physics · 18 min" },
-                      { t: "Linear algebra", s: "Math · 24 min" },
-                      { t: "Organic reactions", s: "Chemistry · 12 min" },
-                    ].map((x) => (
-                      <div key={x.t} className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center">
-                          <GraduationCap className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-medium truncate">{x.t}</div>
-                          <div className="text-[10px] text-muted-foreground">{x.s}</div>
+                <div className="space-y-4">
+                  <div className="bg-card border rounded-2xl p-5 shadow-soft transform rotate-2 hover:rotate-0 transition">
+                    <Sigma className="h-6 w-6 text-violet-500 mb-3" />
+                    <div className="font-medium text-sm">Math</div>
+                    <div className="text-xs text-muted-foreground mt-1">Calculus visualizers built-in.</div>
+                  </div>
+                  <div className="bg-card border rounded-2xl p-5 shadow-soft transform -rotate-1 hover:rotate-0 transition">
+                    <Code2 className="h-6 w-6 text-emerald-500 mb-3" />
+                    <div className="font-medium text-sm">Code</div>
+                    <div className="text-xs text-muted-foreground mt-1">Compile in the browser.</div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="order-1 md:order-2 space-y-6"
+            >
+              <h2 className="text-3xl md:text-5xl font-display font-semibold tracking-tight relative inline-block">
+                {ti("story2Title")}
+                <DoodleUnderline className="absolute -bottom-2 left-0 text-emerald-500" opacity={0.5} />
+              </h2>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                {ti("story2Desc")}
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. STORY 3: AI Tutor */}
+      <section className="py-16 md:py-24 relative bg-background overflow-hidden">
+        <DoodleFlask className="hidden md:block absolute top-20 left-10 text-fuchsia-500" size={80} opacity={0.1} />
+        <DoodleStar className="hidden md:block absolute bottom-20 right-20 text-yellow-500" size={60} opacity={0.15} />
+        <div className="mx-auto max-w-7xl px-6 text-center mb-12 md:mb-16">
+          <h2 className="text-3xl md:text-5xl font-display font-semibold tracking-tight mb-4 md:mb-6">{ti("story3Title")}</h2>
+          <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">{ti("story3Desc")}</p>
+        </div>
+        
+        <div className="mx-auto max-w-4xl px-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="rounded-2xl border bg-surface shadow-card overflow-hidden"
+          >
+            <div className="flex items-center gap-2 border-b px-4 py-3 bg-surface-elevated">
+              <div className="flex gap-1.5">
+                <div className="h-3 w-3 rounded-full bg-red-400/70" />
+                <div className="h-3 w-3 rounded-full bg-yellow-400/70" />
+                <div className="h-3 w-3 rounded-full bg-green-400/70" />
+              </div>
+              <div className="ml-3 text-xs font-medium text-muted-foreground flex items-center gap-2">
+                <MessageCircle className="h-3.5 w-3.5" />
+                stemos.app/tutor
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-6 bg-gradient-to-b from-transparent to-surface-elevated/30">
+              {chatDemoMessages.slice(0, chatDemo + 1).map((m, idx) => (
+                <motion.div 
+                  key={idx}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex gap-4 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  {m.role === 'ai' && (
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                    </div>
+                  )}
+                  <div className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm leading-relaxed ${
+                    m.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-card border rounded-tl-sm shadow-sm'
+                  }`}>
+                    {m.msg}
+                  </div>
+                </motion.div>
+              ))}
+              {chatDemo < chatDemoMessages.length - 1 && (
+                <div className="flex gap-4">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="px-4 py-3 rounded-2xl bg-card border rounded-tl-sm text-sm text-muted-foreground flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0.15s' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0.3s' }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 5. STORY 4: Gamification */}
+      <section className="py-16 md:py-24 bg-surface-elevated border-y relative overflow-hidden">
+        <DoodleAtom className="hidden md:block absolute bottom-10 right-10 text-emerald-500" size={90} opacity={0.1} />
+        <div className="mx-auto max-w-7xl px-6 grid md:grid-cols-2 gap-12 md:gap-16 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="space-y-4 md:space-y-6"
+          >
+            <h2 className="text-3xl md:text-5xl font-display font-semibold tracking-tight">{ti("story4Title")}</h2>
+            <p className="text-lg text-muted-foreground leading-relaxed">{ti("story4Desc")}</p>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="relative"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <DashCard title={ti("dashStreak")} value="42" suffix="days" icon={Flame} accent="from-amber-400 to-orange-500" />
+              <DashCard title={ti("dashXP")} value="12,840" icon={Trophy} accent="from-violet-400 to-fuchsia-500" />
+              <div className="col-span-1 sm:col-span-2 rounded-xl border bg-card p-5">
+                <div className="text-sm font-medium mb-3">{ti("dashUpNext")}</div>
+                <div className="space-y-3">
+                  {[
+                    { t: "Quantum mechanics", s: "Physics · 18 min", p: 75 },
+                    { t: "Linear algebra", s: "Math · 24 min", p: 30 },
+                  ].map((x) => (
+                    <div key={x.t} className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                        <GraduationCap className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{x.t}</div>
+                        <div className="text-xs text-muted-foreground">{x.s}</div>
+                        <div className="mt-2 h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                          <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${x.p}%` }} />
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-
-            {/* Floating chips */}
+            
+            {/* Gen-Z badge floating */}
             <motion.div
               animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -left-6 top-1/3 hidden md:flex items-center gap-2 glass-strong rounded-xl px-3 py-2 shadow-card"
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -right-2 top-0 md:-right-6 md:top-1/4 flex items-center gap-2 glass-strong border border-yellow-500/20 rounded-xl px-3 py-1.5 md:px-4 md:py-2 shadow-card will-change-transform z-10"
             >
-              <Atom className="h-4 w-4 text-cyan-500" />
-              <span className="text-xs font-medium">F = ma</span>
-            </motion.div>
-            <motion.div
-              animate={{ y: [0, 10, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-              className="absolute -right-6 top-1/2 hidden md:flex items-center gap-2 glass-strong rounded-xl px-3 py-2 shadow-card"
-            >
-              <Sigma className="h-4 w-4 text-violet-500" />
-              <span className="text-xs font-mono">∫ e^x dx</span>
+              <span className="text-lg md:text-xl">🧠</span>
+              <span className="text-[10px] md:text-xs font-bold text-foreground">Brain XP Upgraded</span>
             </motion.div>
           </motion.div>
         </div>
       </section>
 
-      {/* LOGOS / SUBJECTS STRIP */}
-      <section className="border-y bg-surface-elevated">
-        <div className="mx-auto max-w-7xl px-6 py-10">
-          <p className="text-center text-xs uppercase tracking-widest text-muted-foreground mb-6">Trusted by curious learners from 120+ universities</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {subjects.map((s) => (
-              <div key={s.name} className="flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground">
-                <s.icon className="h-4 w-4" />
-                {s.name}
-              </div>
+      {/* 6. STORY 5: Languages */}
+      <section className="py-16 md:py-24 bg-background relative text-center">
+        <div className="mx-auto max-w-4xl px-6">
+          <h2 className="text-3xl md:text-5xl font-display font-semibold tracking-tight mb-4 md:mb-6">{ti("story5Title")}</h2>
+          <p className="text-base md:text-lg text-muted-foreground leading-relaxed mb-8 md:mb-12">{ti("story5Desc")}</p>
+          
+          <div className="flex flex-wrap justify-center gap-3">
+            {[
+              { code: "en", label: "English" },
+              { code: "hi", label: "हिन्दी" },
+              { code: "mr", label: "मराठी" },
+              { code: "es", label: "Español" },
+              { code: "fr", label: "Français" },
+              { code: "de", label: "Deutsch" },
+              { code: "ja", label: "日本語" },
+              { code: "ar", label: "العربية" }
+            ].map((langObj, i) => (
+              <motion.button
+                key={langObj.code}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    const event = new CustomEvent('change-language', { detail: langObj.code });
+                    window.dispatchEvent(event);
+                    import("sonner").then(({ toast }) => toast.success(`Language set to ${langObj.label}`));
+                  }
+                }}
+                className="px-5 py-2.5 rounded-full border bg-surface shadow-soft text-sm font-medium hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-colors"
+              >
+                {langObj.label}
+              </motion.button>
             ))}
           </div>
         </div>
       </section>
 
-      {/* STATS */}
-      <section className="mx-auto max-w-7xl px-6 py-24">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {[
-            ["120K+", "Active students"],
-            ["3.2M", "Questions solved"],
-            ["98%", "Pass rate"],
-            ["45 min", "Avg. daily session"],
-          ].map(([v, l]) => (
-            <div key={l} className="rounded-2xl border bg-card p-6">
-              <div className="font-display text-3xl md:text-4xl font-semibold text-gradient">{v}</div>
-              <div className="mt-1 text-sm text-muted-foreground">{l}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FEATURES */}
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="max-w-2xl">
-          <div className="text-xs font-medium text-primary uppercase tracking-widest">Features</div>
-          <h2 className="mt-3 font-display text-4xl md:text-5xl font-semibold tracking-tight">Everything you need to master STEM</h2>
-          <p className="mt-4 text-muted-foreground">From first principles to advanced topics — STEMOS adapts to your pace, finds your gaps, and builds the path forward.</p>
-        </div>
-
-        <div className="mt-14 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[
-            { icon: BrainCircuit, title: "AI Tutor", desc: "Ask anything. Get step-by-step explanations grounded in first principles, not just answers." },
-            { icon: Target, title: "Smart Quizzes", desc: "Adaptive MCQs that target your weak spots and reinforce mastery via spaced repetition." },
-            { icon: Trophy, title: "XP & Streaks", desc: "Earn XP, build streaks, unlock badges. Gamified for motivation that actually lasts." },
-            { icon: BarChart3, title: "Deep Analytics", desc: "Per-topic mastery, time-on-task, and predictive insights into where you'll struggle next." },
-            { icon: Sparkles, title: "Personalized Paths", desc: "Roadmaps from beginner to expert, custom-tuned to your goals — exams, research, or curiosity." },
-            { icon: GraduationCap, title: "Exam Prep", desc: "SAT, AP, IB, JEE, A-Levels. Curated content and realistic timed practice." },
-          ].map((f) => (
-            <motion.div
-              key={f.title}
-              whileHover={{ y: -4 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="group rounded-2xl border bg-card p-6 shadow-soft hover:shadow-card transition-shadow"
-            >
-              <div className="h-10 w-10 rounded-xl bg-gradient-hero flex items-center justify-center shadow-glow">
-                <f.icon className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <h3 className="mt-5 font-display text-lg font-semibold">{f.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* TESTIMONIALS */}
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="text-center max-w-2xl mx-auto">
-          <div className="text-xs font-medium text-primary uppercase tracking-widest">Loved by students</div>
-          <h2 className="mt-3 font-display text-4xl md:text-5xl font-semibold tracking-tight">A new way to learn</h2>
-        </div>
-        <div className="mt-14 grid md:grid-cols-3 gap-5">
-          {[
-            { name: "Ananya Rao", role: "JEE Aspirant", q: "The AI tutor explains physics in a way my school never did. I jumped 40 percentile in 3 months." },
-            { name: "Marcus Chen", role: "CS Undergrad", q: "STEMOS is what Khan Academy would look like if it was rebuilt today. Incredibly polished." },
-            { name: "Priya Sharma", role: "High School Senior", q: "I'm addicted to my learning streak. Studying finally feels like a game I want to play." },
-          ].map((t) => (
-            <div key={t.name} className="rounded-2xl border bg-card p-6 shadow-soft">
-              <div className="flex gap-0.5 text-amber-400">
-                {[...Array(5)].map((_, i) => <Star key={i} className="h-3.5 w-3.5 fill-current" />)}
-              </div>
-              <p className="mt-4 text-sm leading-relaxed">"{t.q}"</p>
-              <div className="mt-5 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-gradient-hero flex items-center justify-center text-primary-foreground text-xs font-semibold">
-                  {t.name.split(" ").map(s => s[0]).join("")}
-                </div>
-                <div>
-                  <div className="text-sm font-medium">{t.name}</div>
-                  <div className="text-xs text-muted-foreground">{t.role}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* PRICING */}
-      <section id="pricing" className="mx-auto max-w-7xl px-6 py-20">
-        <div className="text-center max-w-2xl mx-auto">
-          <div className="text-xs font-medium text-primary uppercase tracking-widest">Pricing</div>
-          <h2 className="mt-3 font-display text-4xl md:text-5xl font-semibold tracking-tight">Simple, student-friendly pricing</h2>
-        </div>
-        <div className="mt-14 grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
-          {[
-            { name: "Free", price: "$0", desc: "For curious learners getting started.", features: ["Unlimited AI tutor (50 msgs/day)", "Basic quizzes", "1 learning path", "Community access"], cta: "Start free", featured: false },
-            { name: "Pro", price: "$12", per: "/mo", desc: "For serious students.", features: ["Unlimited AI tutor", "Adaptive quiz engine", "All learning paths", "Advanced analytics", "Exam prep modules"], cta: "Go Pro", featured: true },
-            { name: "Campus", price: "Custom", desc: "For schools and universities.", features: ["Everything in Pro", "Teacher dashboard", "Class analytics", "SSO & LMS integration", "Dedicated support"], cta: "Contact sales", featured: false },
-          ].map((p) => (
-            <div key={p.name} className={`relative rounded-2xl border p-7 ${p.featured ? "bg-gradient-to-b from-primary/5 to-transparent border-primary/30 ring-glow" : "bg-card"}`}>
-              {p.featured && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-foreground text-background text-[10px] font-medium px-2.5 py-1 uppercase tracking-widest">Most popular</div>
-              )}
-              <div className="text-sm font-medium">{p.name}</div>
-              <div className="mt-3 font-display text-4xl font-semibold">
-                {p.price}<span className="text-base font-normal text-muted-foreground">{p.per ?? ""}</span>
-              </div>
-              <div className="mt-2 text-sm text-muted-foreground">{p.desc}</div>
-              <ul className="mt-6 space-y-2.5">
-                {p.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm">
-                    <Check className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link to="/signup" className={`mt-7 w-full inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium transition ${p.featured ? "bg-foreground text-background hover:opacity-90" : "border hover:bg-secondary"}`}>
-                {p.cta}
-              </Link>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="relative overflow-hidden rounded-3xl border bg-gradient-hero p-12 md:p-16 text-center">
-          <div className="absolute inset-0 grid-pattern opacity-20" />
-          <div className="relative">
-            <h2 className="font-display text-4xl md:text-5xl font-semibold tracking-tight text-primary-foreground">Ready to think differently?</h2>
-            <p className="mt-4 text-primary-foreground/80 max-w-xl mx-auto">Join 120,000+ students transforming how they learn STEM with AI.</p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link to="/signup" className="inline-flex items-center gap-2 rounded-xl bg-background text-foreground px-5 py-3 text-sm font-medium hover:opacity-90 transition">
-                Start free <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link to="/tutor" className="inline-flex items-center gap-2 rounded-xl border border-primary-foreground/30 text-primary-foreground px-5 py-3 text-sm font-medium hover:bg-primary-foreground/10 transition">
-                Try AI Tutor
-              </Link>
-            </div>
+      {/* 7. FUTURE & CTA */}
+      <section className="py-20 md:py-32 relative overflow-hidden">
+        <div className="absolute inset-0 bg-primary/5" />
+        <div className="absolute inset-0 bg-gradient-hero opacity-30 blur-[100px]" />
+        
+        <DoodleScribble className="hidden md:block absolute top-10 left-10 text-primary" size={120} opacity={0.2} />
+        <DoodleRocket className="hidden md:block absolute bottom-10 right-10 text-violet-500" size={100} opacity={0.2} />
+        
+        <div className="relative mx-auto max-w-3xl px-6 text-center">
+          <h2 className="text-4xl md:text-6xl font-display font-bold tracking-tight mb-8">
+            {ti("story6Title")}
+          </h2>
+          <p className="text-xl text-muted-foreground mb-10">
+            {ti("story6Desc")}
+          </p>
+          
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link to={user ? "/dashboard" : "/signup"} className="rounded-xl bg-foreground text-background px-8 py-4 text-base font-semibold shadow-xl hover:scale-105 transition-transform">
+              {user ? t("goToDashboard") : t("startLearning")}
+            </Link>
           </div>
         </div>
       </section>
     </Layout>
-  );
-}
-
-function DashCard({ title, value, suffix, icon: Icon, accent }: { title: string; value: string; suffix?: string; icon: any; accent: string }) {
-  return (
-    <div className="rounded-xl border bg-card p-5">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-muted-foreground">{title}</div>
-        <div className={`h-7 w-7 rounded-lg bg-gradient-to-br ${accent} flex items-center justify-center`}>
-          <Icon className="h-3.5 w-3.5 text-white" />
-        </div>
-      </div>
-      <div className="mt-3 flex items-baseline gap-1.5">
-        <div className="font-display text-2xl font-semibold">{value}</div>
-        {suffix && <div className="text-xs text-muted-foreground">{suffix}</div>}
-      </div>
-    </div>
   );
 }

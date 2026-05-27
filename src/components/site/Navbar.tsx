@@ -1,32 +1,58 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Sparkles, Menu, X, LogOut } from "lucide-react";
-import { useState } from "react";
+import { Sparkles, Menu, X, LogOut, Flame, Trophy } from "lucide-react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
+import { useLanguage } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
-const links = [
-  { to: "/", label: "Home" },
-  { to: "/tutor", label: "AI Tutor" },
-  { to: "/quiz", label: "Quizzes" },
-  { to: "/paths", label: "Learning Paths" },
-  { to: "/dashboard", label: "Dashboard" },
-];
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function Navbar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
+  const [xp, setXp] = useState<number | null>(null);
+  const [streak, setStreak] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!user) { setXp(null); setStreak(null); return; }
+    supabase
+      .from("profiles")
+      .select("total_xp,current_streak")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) { setXp(data.total_xp ?? 0); setStreak(data.current_streak ?? 0); }
+      });
+  }, [user]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    toast.success("Signed out");
+    toast.success(t("seeYouTomorrow"));
     navigate({ to: "/" });
   };
 
   const initial = (user?.user_metadata?.display_name || user?.email || "?").slice(0, 1).toUpperCase();
+
+  const authedLinks = [
+    { to: "/tutor", label: t("tutor") },
+    { to: "/lab", label: "Lab" },
+    { to: "/paths", label: t("paths") },
+    { to: "/arena", label: "Arena" },
+    { to: "/shop", label: "Shop" },
+    { to: "/dashboard", label: t("dashboard") },
+  ];
+  const publicLinks = [
+    { to: "/", label: t("home") },
+    { to: "/tutor", label: t("tutor") },
+    { to: "/lab", label: "Lab" },
+    { to: "/paths", label: t("paths") },
+    { to: "/arena", label: "Arena" },
+  ];
+  const links = user ? authedLinks : publicLinks;
 
   return (
     <header className="sticky top-0 z-50">
@@ -37,7 +63,7 @@ export function Navbar() {
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </div>
           <span className="font-display text-lg font-semibold tracking-tight">STEMOS</span>
-          <span className="ml-1 hidden sm:inline-block text-[10px] uppercase tracking-widest text-muted-foreground px-1.5 py-0.5 rounded border">Beta</span>
+          <span className="ml-1 hidden sm:inline-block text-[10px] uppercase tracking-widest text-muted-foreground px-1.5 py-0.5 rounded border">{t("beta")}</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
@@ -63,26 +89,40 @@ export function Navbar() {
         </div>
 
         <div className="hidden md:flex items-center gap-2">
+          {/* Language Switcher */}
+          <LanguageSwitcher />
+
           {user ? (
             <>
+              {xp !== null && streak !== null && (
+                <div className="flex items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 text-xs">
+                  <span className="flex items-center gap-1 text-amber-500 font-semibold">
+                    <Flame className="h-3.5 w-3.5" />{streak} {t("dayStreak")}
+                  </span>
+                  <div className="h-3.5 w-px bg-border" />
+                  <span className="flex items-center gap-1 text-violet-500 font-semibold">
+                    <Trophy className="h-3.5 w-3.5" />{xp.toLocaleString()} XP
+                  </span>
+                </div>
+              )}
               <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-secondary transition">
                 <span className="h-6 w-6 rounded-md bg-gradient-hero text-primary-foreground flex items-center justify-center text-[11px] font-semibold">{initial}</span>
-                <span className="max-w-[120px] truncate">{user.user_metadata?.display_name || user.email}</span>
+                <span className="max-w-[100px] truncate">{user.user_metadata?.display_name || user.email}</span>
               </Link>
-              <button onClick={signOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-2" aria-label="Sign out">
+              <button onClick={signOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-2" aria-label={t("signOut")}>
                 <LogOut className="h-4 w-4" />
               </button>
             </>
           ) : (
             <>
               <Link to="/signin" className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2">
-                Sign in
+                {t("signIn")}
               </Link>
               <Link
                 to="/signup"
                 className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity shadow-soft"
               >
-                Get started
+                {t("getStarted")}
               </Link>
             </>
           )}
@@ -108,12 +148,26 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="h-px bg-border my-2" />
+
+              {/* Mobile language switcher */}
+              <div className="py-1">
+                <LanguageSwitcher />
+              </div>
+
               {user ? (
-                <button onClick={() => { setOpen(false); signOut(); }} className="text-left py-2 text-sm">Sign out</button>
+                <>
+                  {xp !== null && streak !== null && (
+                    <div className="flex items-center gap-3 py-2 text-xs">
+                      <span className="flex items-center gap-1 text-amber-500 font-semibold"><Flame className="h-3.5 w-3.5" />{streak} {t("dayStreak")}</span>
+                      <span className="flex items-center gap-1 text-violet-500 font-semibold"><Trophy className="h-3.5 w-3.5" />{xp?.toLocaleString()} XP</span>
+                    </div>
+                  )}
+                  <button onClick={() => { setOpen(false); signOut(); }} className="text-left py-2 text-sm">{t("signOut")}</button>
+                </>
               ) : (
                 <>
-                  <Link to="/signin" onClick={() => setOpen(false)} className="py-2 text-sm">Sign in</Link>
-                  <Link to="/signup" onClick={() => setOpen(false)} className="py-2 text-sm font-medium">Get started →</Link>
+                  <Link to="/signin" onClick={() => setOpen(false)} className="py-2 text-sm">{t("signIn")}</Link>
+                  <Link to="/signup" onClick={() => setOpen(false)} className="py-2 text-sm font-medium">{t("getStarted")} →</Link>
                 </>
               )}
             </div>

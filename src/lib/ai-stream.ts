@@ -4,15 +4,17 @@ export async function streamChat({
   messages,
   onDelta,
   signal,
+  locale,
 }: {
   messages: ChatMsg[];
   onDelta: (chunk: string) => void;
   signal?: AbortSignal;
+  locale?: string;
 }): Promise<void> {
   const resp = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, locale }),
     signal,
   });
 
