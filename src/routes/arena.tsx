@@ -14,11 +14,39 @@ export const Route = createFileRoute("/arena")({
 type Message = { id: string; user_id: string; username: string; content: string; isSystem?: boolean; };
 type Friend = { id: string; username: string };
 
-const RAPID_FIRE_QUESTIONS = [
-  { q: "What is the powerhouse of the cell?", a: "mitochondria" },
-  { q: "What is the derivative of x^2?", a: "2x" },
-  { q: "What is the chemical symbol for Gold?", a: "au" },
-  { q: "What does CPU stand for?", a: "central processing unit" },
+type MCQQuestion = {
+  q: string;
+  options: string[];
+  a: string; // "A" | "B" | "C" | "D"
+  position?: { top: string; left: string; };
+};
+
+const RAPID_FIRE_QUESTIONS: MCQQuestion[] = [
+  {
+    q: "Which element has the highest thermal conductivity of all known elements?",
+    options: ["Copper", "Diamond", "Silver", "Gold"],
+    a: "B"
+  },
+  {
+    q: "What is the correct order of the stages of a cellular action potential?",
+    options: [
+      "Depolarization, Repolarization, Hyperpolarization",
+      "Resting, Depolarization, Threshold, Peak",
+      "Threshold, Depolarization, Repolarization, Underflow",
+      "Resting state, Threshold, Depolarization, Peak, Repolarization, Hyperpolarization"
+    ],
+    a: "D"
+  },
+  {
+    q: "Which subatomic particle has a spin value of 1/2 and is classified as a lepton?",
+    options: ["Electron", "Proton", "Neutron", "Gluon"],
+    a: "A"
+  },
+  {
+    q: "In late 2022, which NASA mission successfully redirected an asteroid's orbit via kinetic impact?",
+    options: ["OSIRIS-REx", "DART (Double Asteroid Redirection Test)", "Lucy", "Psyche"],
+    a: "B"
+  }
 ];
 
 function ArenaPage() {
@@ -31,8 +59,7 @@ function ArenaPage() {
   const [onlineCount, setOnlineCount] = useState(1);
   
   // Rapid Fire State
-  const [activeQuestion, setActiveQuestion] = useState<any>(null);
-  const [rfInput, setRfInput] = useState("");
+  const [activeQuestion, setActiveQuestion] = useState<MCQQuestion | null>(null);
   
   // Friends State
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -122,11 +149,37 @@ function ArenaPage() {
 
     channelRef.current = channel;
 
-    const interval = setInterval(() => {
-      const q = RAPID_FIRE_QUESTIONS[Math.floor(Math.random() * RAPID_FIRE_QUESTIONS.length)];
-      channel.send({ type: "broadcast", event: "rapid_fire", payload: q });
-      setActiveQuestion(q);
-    }, 30000); // Popup every 30s
+    const triggerNewQuestion = async () => {
+      try {
+        const res = await fetch("/api/generate-question");
+        if (!res.ok) throw new Error("Failed to fetch generated question");
+        const q = await res.json();
+        
+        // Dynamic random position in Arena viewport (safe boundaries: 15-65% top, 10-60% left)
+        const top = `${Math.floor(Math.random() * 50) + 15}%`;
+        const left = `${Math.floor(Math.random() * 50) + 10}%`;
+        q.position = { top, left };
+
+        channel.send({ type: "broadcast", event: "rapid_fire", payload: q });
+        setActiveQuestion(q);
+      } catch (err) {
+        console.error("Failed to generate dynamic question:", err);
+        // Fallback to static MCQs
+        const baseQ = RAPID_FIRE_QUESTIONS[Math.floor(Math.random() * RAPID_FIRE_QUESTIONS.length)];
+        const q = { ...baseQ };
+        const top = `${Math.floor(Math.random() * 50) + 15}%`;
+        const left = `${Math.floor(Math.random() * 50) + 10}%`;
+        q.position = { top, left };
+        
+        channel.send({ type: "broadcast", event: "rapid_fire", payload: q });
+        setActiveQuestion(q);
+      }
+    };
+
+    // Initial trigger
+    setTimeout(triggerNewQuestion, 5000);
+
+    const interval = setInterval(triggerNewQuestion, 60000); // Popup every 60s (1 minute)
 
     return () => {
       clearInterval(interval);
@@ -192,19 +245,34 @@ function ArenaPage() {
     }
   };
 
-  const handleRapidFireAnswer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rfInput.trim() || !activeQuestion || !session) return;
-    const text = rfInput.trim().toLowerCase();
-    setRfInput("");
+  const handleRapidFireChoice = async (choice: string) => {
+    if (!activeQuestion || !session) return;
 
-    if (text.includes(activeQuestion.a.toLowerCase())) {
-      const winMsg = { id: Math.random().toString(), user_id: "sys", username: "Rapid Fire Bot", content: `🎉 ${session.user.email?.split('@')[0]} got it right! The answer was ${activeQuestion.a}. +500 XP!`, isSystem: true, action: "question_solved" };
-      await supabase.from("quiz_attempts").insert({ user_id: session.user.id, subject: "Arena Rapid Fire", score: 1, xp_earned: 500 });
+    if (choice === activeQuestion.a) {
+      const optionIndex = activeQuestion.a.charCodeAt(0) - 65;
+      const optionText = activeQuestion.options[optionIndex] || activeQuestion.a;
+      const winMsg = { 
+        id: Math.random().toString(), 
+        user_id: "sys", 
+        username: "Rapid Fire Bot", 
+        content: `🎉 ${session.user.email?.split('@')[0]} answered correctly! Option ${activeQuestion.a}: "${optionText}". +21 XP!`, 
+        isSystem: true, 
+        action: "question_solved" 
+      };
+      
+      // Award exactly 21 XP/points!
+      await supabase.from("quiz_attempts").insert({ 
+        user_id: session.user.id, 
+        subject: "Arena Rapid Fire MCQ", 
+        score: 1, 
+        xp_earned: 21 
+      });
+      
       channelRef.current?.send({ type: "broadcast", event: "system", payload: winMsg });
       setActiveQuestion(null);
+      toast.success("Correct answer! +21 points!");
     } else {
-      toast.error("Incorrect! Keep trying.");
+      toast.error("Incorrect! Try another option.");
     }
   };
 
@@ -358,17 +426,41 @@ function ArenaPage() {
         {/* Rapid Fire Overlay Panel */}
         <AnimatePresence>
           {activeQuestion && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute top-6 right-6 w-80 bg-gradient-to-br from-amber-500 to-orange-600 text-white p-[2px] rounded-[2rem] shadow-glow z-30">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.8 }} 
+              className="absolute w-80 bg-gradient-to-br from-amber-500 to-orange-600 text-white p-[2px] rounded-[2rem] shadow-glow z-30"
+              style={{
+                top: activeQuestion.position?.top || "20%",
+                left: activeQuestion.position?.left || "30%",
+                right: "auto"
+              }}
+            >
               <div className="bg-card text-foreground h-full w-full rounded-[calc(2rem-2px)] p-5 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Zap className="h-24 w-24" /></div>
                 <div className="text-xs font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1.5 mb-2">
-                  <Zap className="h-3.5 w-3.5 fill-current" /> Rapid Fire
+                  <Zap className="h-3.5 w-3.5 fill-current" /> Rapid Fire MCQ
                 </div>
-                <h3 className="font-display font-bold text-lg leading-tight mb-4">{activeQuestion.q}</h3>
-                <form onSubmit={handleRapidFireAnswer} className="flex gap-2">
-                  <input type="text" value={rfInput} onChange={e => setRfInput(e.target.value)} placeholder="Type answer..." className="flex-1 rounded-xl border-2 border-amber-500/20 bg-background px-3 py-2 text-sm focus:outline-none focus:border-amber-500 transition" />
-                  <button type="submit" className="px-4 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition">Go</button>
-                </form>
+                <h3 className="font-display font-bold text-sm leading-snug mb-4">{activeQuestion.q}</h3>
+                
+                <div className="space-y-2">
+                  {activeQuestion.options.map((opt: string, idx: number) => {
+                    const label = String.fromCharCode(65 + idx); // A, B, C, D
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => handleRapidFireChoice(label)}
+                        className="w-full text-left bg-background hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500 px-4 py-2.5 rounded-xl text-xs font-medium transition flex items-center gap-2 group text-foreground"
+                      >
+                        <span className="h-6 w-6 rounded-lg bg-amber-500/10 text-amber-600 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center font-bold text-xs shrink-0 transition">
+                          {label}
+                        </span>
+                        <span className="truncate">{opt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </motion.div>
           )}

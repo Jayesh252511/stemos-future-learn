@@ -4,11 +4,14 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useNavigate,
+  useLocation,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
+import { MessageSquare, X } from "lucide-react";
 import { LanguageProvider } from "@/lib/i18n";
 
 import appCss from "../styles.css?url";
@@ -131,6 +134,93 @@ function AuthSync() {
   return null;
 }
 
+function GlobalNotificationSystem() {
+  const navigate = useNavigate();
+  const [notification, setNotification] = useState<{
+    title: string;
+    message: string;
+    senderId?: string;
+    senderName?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const channel = supabase.channel("live-arena-global", {
+      config: { presence: { key: "user" }, broadcast: { self: false } }
+    });
+
+    channel
+      .on("broadcast", { event: "chat" }, (payload) => {
+        if (window.location.pathname !== "/arena") {
+          setNotification({
+            title: `Global Chat — @${payload.payload.username}`,
+            message: payload.payload.content,
+          });
+        }
+      })
+      .on("broadcast", { event: "private_message" }, (payload) => {
+        supabase.auth.getSession().then(({ data }) => {
+          const currentUserId = data.session?.user?.id;
+          if (currentUserId && payload.payload.to_id === currentUserId) {
+            setNotification({
+              title: `Private Message from @${payload.payload.msg.username}`,
+              message: payload.payload.msg.content,
+              senderId: payload.payload.from_id,
+              senderName: payload.payload.msg.username,
+            });
+          }
+        });
+      })
+      .on("broadcast", { event: "friend_request" }, (payload) => {
+        supabase.auth.getSession().then(({ data }) => {
+          const currentUserId = data.session?.user?.id;
+          if (currentUserId && payload.payload.to_id === currentUserId) {
+            setNotification({
+              title: "Study Buddy Request 👥",
+              message: `@${payload.payload.from_username} sent you a study buddy request!`,
+            });
+          }
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  if (!notification) return null;
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-card/95 backdrop-blur-md border border-primary/20 rounded-[2rem] shadow-2xl p-5 animate-in slide-in-from-bottom duration-300">
+      <div className="flex items-start gap-4">
+        <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+          <MessageSquare className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => {
+          navigate({ to: "/arena" });
+          setNotification(null);
+        }}>
+          <h4 className="text-sm font-bold text-foreground truncate">{notification.title}</h4>
+          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{notification.message}</p>
+          <span className="text-[10px] text-primary font-bold tracking-wider mt-2.5 block hover:underline">CLICK TO OPEN CHAT</span>
+        </div>
+        <button onClick={() => setNotification(null)} className="text-muted-foreground hover:text-foreground transition flex-shrink-0">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -140,6 +230,7 @@ function RootComponent() {
         <AuthSync />
         <Outlet />
         <Toaster position="top-right" richColors closeButton />
+        <GlobalNotificationSystem />
       </QueryClientProvider>
     </LanguageProvider>
   );

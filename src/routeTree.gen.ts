@@ -22,6 +22,7 @@ import { Route as ArenaRouteImport } from './routes/arena'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiQuizRouteImport } from './routes/api/quiz'
 import { Route as ApiModerateChatRouteImport } from './routes/api/moderate-chat'
+import { Route as ApiGenerateQuestionRouteImport } from './routes/api/generate-question'
 import { Route as ApiGeneratePathRouteImport } from './routes/api/generate-path'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
@@ -90,6 +91,11 @@ const ApiModerateChatRoute = ApiModerateChatRouteImport.update({
   path: '/api/moderate-chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGenerateQuestionRoute = ApiGenerateQuestionRouteImport.update({
+  id: '/api/generate-question',
+  path: '/api/generate-question',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGeneratePathRoute = ApiGeneratePathRouteImport.update({
   id: '/api/generate-path',
   path: '/api/generate-path',
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/tutor': typeof TutorRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-path': typeof ApiGeneratePathRoute
+  '/api/generate-question': typeof ApiGenerateQuestionRoute
   '/api/moderate-chat': typeof ApiModerateChatRoute
   '/api/quiz': typeof ApiQuizRoute
 }
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/tutor': typeof TutorRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-path': typeof ApiGeneratePathRoute
+  '/api/generate-question': typeof ApiGenerateQuestionRoute
   '/api/moderate-chat': typeof ApiModerateChatRoute
   '/api/quiz': typeof ApiQuizRoute
 }
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/tutor': typeof TutorRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-path': typeof ApiGeneratePathRoute
+  '/api/generate-question': typeof ApiGenerateQuestionRoute
   '/api/moderate-chat': typeof ApiModerateChatRoute
   '/api/quiz': typeof ApiQuizRoute
 }
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/tutor'
     | '/api/chat'
     | '/api/generate-path'
+    | '/api/generate-question'
     | '/api/moderate-chat'
     | '/api/quiz'
   fileRoutesByTo: FileRoutesByTo
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/tutor'
     | '/api/chat'
     | '/api/generate-path'
+    | '/api/generate-question'
     | '/api/moderate-chat'
     | '/api/quiz'
   id:
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/tutor'
     | '/api/chat'
     | '/api/generate-path'
+    | '/api/generate-question'
     | '/api/moderate-chat'
     | '/api/quiz'
   fileRoutesById: FileRoutesById
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   TutorRoute: typeof TutorRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGeneratePathRoute: typeof ApiGeneratePathRoute
+  ApiGenerateQuestionRoute: typeof ApiGenerateQuestionRoute
   ApiModerateChatRoute: typeof ApiModerateChatRoute
   ApiQuizRoute: typeof ApiQuizRoute
 }
@@ -318,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiModerateChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/generate-question': {
+      id: '/api/generate-question'
+      path: '/api/generate-question'
+      fullPath: '/api/generate-question'
+      preLoaderRoute: typeof ApiGenerateQuestionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/generate-path': {
       id: '/api/generate-path'
       path: '/api/generate-path'
@@ -349,6 +369,7 @@ const rootRouteChildren: RootRouteChildren = {
   TutorRoute: TutorRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGeneratePathRoute: ApiGeneratePathRoute,
+  ApiGenerateQuestionRoute: ApiGenerateQuestionRoute,
   ApiModerateChatRoute: ApiModerateChatRoute,
   ApiQuizRoute: ApiQuizRoute,
 }
