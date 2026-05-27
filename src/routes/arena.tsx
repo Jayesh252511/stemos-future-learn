@@ -68,6 +68,19 @@ function ArenaPage() {
   const [privateMessages, setPrivateMessages] = useState<Record<string, Message[]>>({});
   const [privateInput, setPrivateInput] = useState("");
 
+  // Mobile responsiveness states
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"chat" | "buddies">("chat");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsMobile(window.innerWidth < 768);
+      const handleResize = () => setIsMobile(window.innerWidth < 768);
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }
+  }, []);
+
   const channelRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const privateScrollRef = useRef<HTMLDivElement>(null);
@@ -249,6 +262,7 @@ function ArenaPage() {
     if (!activeQuestion || !session) return;
 
     if (choice === activeQuestion.a) {
+      setActiveQuestion(null); // Hide question instantly for blazing fast visual response!
       const optionIndex = activeQuestion.a.charCodeAt(0) - 65;
       const optionText = activeQuestion.options[optionIndex] || activeQuestion.a;
       const winMsg = { 
@@ -269,7 +283,6 @@ function ArenaPage() {
       });
       
       channelRef.current?.send({ type: "broadcast", event: "system", payload: winMsg });
-      setActiveQuestion(null);
       toast.success("Correct answer! +21 points!");
     } else {
       toast.error("Incorrect! Try another option.");
@@ -294,10 +307,33 @@ function ArenaPage() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-7xl px-4 py-6 h-[calc(100vh-80px)] flex gap-6 relative">
+      <div className="mx-auto max-w-7xl px-4 py-4 md:py-6 h-[calc(100vh-100px)] md:h-[calc(100vh-80px)] flex flex-col md:flex-row gap-4 md:gap-6 relative">
         
+        {/* Mobile Navigation Tab Bar (Visible only on mobile) */}
+        {isMobile && (
+          <div className="flex bg-card border rounded-2xl p-1 gap-1 flex-shrink-0 w-full">
+            <button 
+              onClick={() => setMobileTab("chat")} 
+              className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${mobileTab === "chat" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface"}`}
+            >
+              Global Chat
+            </button>
+            <button 
+              onClick={() => setMobileTab("buddies")} 
+              className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${mobileTab === "buddies" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface"} flex items-center justify-center gap-1.5`}
+            >
+              Study Buddies
+              {pendingRequests.length > 0 && (
+                <span className="bg-red-500 text-white rounded-full px-1.5 py-0.5 text-[9px] font-bold">
+                  {pendingRequests.length}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
         {/* Left Sidebar: Study Buddies */}
-        <div className="w-64 flex-shrink-0 bg-card border rounded-[2rem] shadow-sm flex flex-col overflow-hidden">
+        <div className={`w-full md:w-64 flex-shrink-0 bg-card border rounded-[2rem] shadow-sm flex flex-col overflow-hidden ${isMobile && mobileTab !== "buddies" ? "hidden" : "flex"}`}>
           <div className="p-5 border-b bg-surface">
             <h2 className="font-display font-bold flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" /> Study Buddies
@@ -337,7 +373,7 @@ function ArenaPage() {
         </div>
 
         {/* Center: Global Chat */}
-        <div className="flex-1 bg-card border rounded-[2rem] shadow-sm flex flex-col overflow-hidden">
+        <div className={`flex-1 bg-card border rounded-[2rem] shadow-sm flex flex-col overflow-hidden ${isMobile && mobileTab !== "chat" ? "hidden" : "flex"}`}>
           <div className="flex items-center justify-between bg-surface border-b p-5">
             <div>
               <h1 className="font-display text-xl font-bold flex items-center gap-2">
@@ -395,7 +431,17 @@ function ArenaPage() {
         {/* Private Chat Modal Overlay */}
         <AnimatePresence>
           {activePrivateChat && (
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="absolute bottom-6 right-6 w-80 h-96 bg-card border rounded-[2rem] shadow-2xl flex flex-col overflow-hidden z-40">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className={`absolute bg-card border rounded-[2rem] shadow-2xl flex flex-col overflow-hidden z-40 ${
+                isMobile 
+                  ? "fixed bottom-4 left-4 right-4 h-96 w-auto" 
+                  : "bottom-6 right-6 w-80 h-96"
+              }`}
+              style={isMobile ? { bottom: "16px", left: "16px", right: "16px", top: "auto" } : undefined}
+            >
               <div className="bg-primary p-4 text-primary-foreground flex items-center justify-between">
                 <div className="font-semibold text-sm flex items-center gap-2"><MessageSquare className="h-4 w-4"/> {activePrivateChat.username}</div>
                 <button onClick={() => setActivePrivateChat(null)} className="hover:opacity-80"><X className="h-4 w-4"/></button>
@@ -430,12 +476,18 @@ function ArenaPage() {
               initial={{ opacity: 0, scale: 0.8 }} 
               animate={{ opacity: 1, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.8 }} 
-              className="absolute w-80 bg-gradient-to-br from-amber-500 to-orange-600 text-white p-[2px] rounded-[2rem] shadow-glow z-30"
-              style={{
-                top: activeQuestion.position?.top || "20%",
-                left: activeQuestion.position?.left || "30%",
-                right: "auto"
-              }}
+              className={`absolute bg-gradient-to-br from-amber-500 to-orange-600 text-white p-[2px] rounded-[2rem] shadow-glow z-30 ${
+                isMobile ? "fixed left-4 right-4 w-auto" : "w-80"
+              }`}
+              style={
+                isMobile
+                  ? { bottom: "16px", top: "auto", left: "16px", right: "16px" }
+                  : {
+                      top: activeQuestion.position?.top || "20%",
+                      left: activeQuestion.position?.left || "30%",
+                      right: "auto"
+                    }
+              }
             >
               <div className="bg-card text-foreground h-full w-full rounded-[calc(2rem-2px)] p-5 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Zap className="h-24 w-24" /></div>
@@ -451,7 +503,7 @@ function ArenaPage() {
                       <button
                         key={idx}
                         onClick={() => handleRapidFireChoice(label)}
-                        className="w-full text-left bg-background hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500 px-4 py-2.5 rounded-xl text-xs font-medium transition flex items-center gap-2 group text-foreground"
+                        className="w-full text-left bg-background hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500 px-4 py-2.5 rounded-xl text-xs font-medium transition flex items-center gap-2 group text-foreground cursor-pointer"
                       >
                         <span className="h-6 w-6 rounded-lg bg-amber-500/10 text-amber-600 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center font-bold text-xs shrink-0 transition">
                           {label}
