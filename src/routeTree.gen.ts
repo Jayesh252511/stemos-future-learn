@@ -17,6 +17,7 @@ import { Route as ShopRouteImport } from './routes/shop'
 import { Route as QuizRouteImport } from './routes/quiz'
 import { Route as PathsRouteImport } from './routes/paths'
 import { Route as LabRouteImport } from './routes/lab'
+import { Route as GardenRouteImport } from './routes/garden'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ArenaRouteImport } from './routes/arena'
 import { Route as IndexRouteImport } from './routes/index'
@@ -65,6 +66,11 @@ const PathsRoute = PathsRouteImport.update({
 const LabRoute = LabRouteImport.update({
   id: '/lab',
   path: '/lab',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GardenRoute = GardenRouteImport.update({
+  id: '/garden',
+  path: '/garden',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/arena': typeof ArenaRoute
   '/dashboard': typeof DashboardRoute
+  '/garden': typeof GardenRoute
   '/lab': typeof LabRoute
   '/paths': typeof PathsRoute
   '/quiz': typeof QuizRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/arena': typeof ArenaRoute
   '/dashboard': typeof DashboardRoute
+  '/garden': typeof GardenRoute
   '/lab': typeof LabRoute
   '/paths': typeof PathsRoute
   '/quiz': typeof QuizRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/arena': typeof ArenaRoute
   '/dashboard': typeof DashboardRoute
+  '/garden': typeof GardenRoute
   '/lab': typeof LabRoute
   '/paths': typeof PathsRoute
   '/quiz': typeof QuizRoute
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
     | '/'
     | '/arena'
     | '/dashboard'
+    | '/garden'
     | '/lab'
     | '/paths'
     | '/quiz'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/'
     | '/arena'
     | '/dashboard'
+    | '/garden'
     | '/lab'
     | '/paths'
     | '/quiz'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/'
     | '/arena'
     | '/dashboard'
+    | '/garden'
     | '/lab'
     | '/paths'
     | '/quiz'
@@ -235,6 +247,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ArenaRoute: typeof ArenaRoute
   DashboardRoute: typeof DashboardRoute
+  GardenRoute: typeof GardenRoute
   LabRoute: typeof LabRoute
   PathsRoute: typeof PathsRoute
   QuizRoute: typeof QuizRoute
@@ -309,6 +322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LabRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/garden': {
+      id: '/garden'
+      path: '/garden'
+      fullPath: '/garden'
+      preLoaderRoute: typeof GardenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -379,6 +399,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ArenaRoute: ArenaRoute,
   DashboardRoute: DashboardRoute,
+  GardenRoute: GardenRoute,
   LabRoute: LabRoute,
   PathsRoute: PathsRoute,
   QuizRoute: QuizRoute,

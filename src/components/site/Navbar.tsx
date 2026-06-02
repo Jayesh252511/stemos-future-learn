@@ -17,7 +17,7 @@ export function Navbar() {
   const [xp, setXp] = useState<number | null>(null);
   const [streak, setStreak] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchXp = () => {
     if (!user) { setXp(null); setStreak(null); return; }
     supabase
       .from("profiles")
@@ -27,6 +27,14 @@ export function Navbar() {
       .then(({ data }) => {
         if (data) { setXp(data.total_xp ?? 0); setStreak(data.current_streak ?? 0); }
       });
+  };
+
+  useEffect(() => {
+    fetchXp();
+    window.addEventListener('stemos_xp_updated', fetchXp);
+    return () => {
+      window.removeEventListener('stemos_xp_updated', fetchXp);
+    };
   }, [user]);
 
   const signOut = async () => {
@@ -42,6 +50,7 @@ export function Navbar() {
     { to: "/lab", label: "Lab" },
     { to: "/paths", label: t("paths") },
     { to: "/arena", label: "Arena" },
+    { to: "/garden", label: "Garden" },
     { to: "/shop", label: "Shop" },
     { to: "/dashboard", label: t("dashboard") },
   ];
@@ -51,6 +60,7 @@ export function Navbar() {
     { to: "/lab", label: "Lab" },
     { to: "/paths", label: t("paths") },
     { to: "/arena", label: "Arena" },
+    { to: "/garden", label: "Garden" },
   ];
   const links = user ? authedLinks : publicLinks;
 

@@ -160,12 +160,43 @@ export function TutorCloudModal({ isOpen, onClose, nodeTitle, subjectName, onPas
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-hidden">
+      {/* Floating Glowing Abstract Background Blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <motion.div 
+          animate={{
+            x: [0, 100, -50, 0],
+            y: [0, -80, 70, 0],
+            scale: [1, 1.3, 0.8, 1],
+          }}
+          transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
+          className="absolute -top-20 -left-20 w-96 h-96 rounded-full bg-cyan-500/15 blur-3xl"
+        />
+        <motion.div 
+          animate={{
+            x: [0, -120, 60, 0],
+            y: [0, 90, -80, 0],
+            scale: [1, 0.9, 1.2, 1],
+          }}
+          transition={{ repeat: Infinity, duration: 25, ease: "linear" }}
+          className="absolute -bottom-20 -right-20 w-[28rem] h-[28rem] rounded-full bg-violet-500/10 blur-3xl"
+        />
+        <motion.div 
+          animate={{
+            x: [0, 80, -90, 0],
+            y: [0, 120, -60, 0],
+            scale: [1, 1.15, 0.85, 1],
+          }}
+          transition={{ repeat: Infinity, duration: 28, ease: "linear" }}
+          className="absolute top-1/2 left-1/3 w-80 h-80 rounded-full bg-primary/10 blur-3xl"
+        />
+      </div>
+
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 20 }} 
         animate={{ opacity: 1, scale: 1, y: 0 }} 
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-2xl bg-card border shadow-card rounded-[2rem] overflow-hidden flex flex-col h-[85vh] max-h-[800px]"
+        className="relative w-full max-w-2xl bg-card/95 backdrop-blur-md border shadow-card rounded-[2rem] overflow-hidden flex flex-col h-[85vh] max-h-[800px] z-10"
       >
         {/* Glow Effects */}
         <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
@@ -227,6 +258,31 @@ export function TutorCloudModal({ isOpen, onClose, nodeTitle, subjectName, onPas
 
               {/* Chat Input */}
               <div className="p-4 bg-surface border-t">
+                {messages.length > 0 && !streaming && (
+                  <div className="flex gap-2 overflow-x-auto pb-2 mb-2 scrollbar-none">
+                    <button
+                      type="button"
+                      onClick={() => sendChat(`Explain: ${nodeTitle} simply like I am a beginner. Use an everyday analogy.`)}
+                      className="inline-flex items-center gap-1 shrink-0 rounded-full border bg-card hover:bg-secondary px-3 py-1.5 text-xs font-semibold shadow-soft cursor-pointer transition"
+                    >
+                      💡 Explain Simply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendChat(`Give me a practical real-world example of: ${nodeTitle} that I would encounter in daily life.`)}
+                      className="inline-flex items-center gap-1 shrink-0 rounded-full border bg-card hover:bg-secondary px-3 py-1.5 text-xs font-semibold shadow-soft cursor-pointer transition"
+                    >
+                      🔍 Real-world Example
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendChat(`What are the key concept takeaways and bullet summaries of: ${nodeTitle}?`)}
+                      className="inline-flex items-center gap-1 shrink-0 rounded-full border bg-card hover:bg-secondary px-3 py-1.5 text-xs font-semibold shadow-soft cursor-pointer transition"
+                    >
+                      🧩 Key Takeaways
+                    </button>
+                  </div>
+                )}
                 {messages.length > 2 && !streaming && (
                   <button onClick={startQuiz} className="mb-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-glow hover:opacity-90 transition">
                     <Check className="h-4 w-4" /> I'm Ready for the Quiz

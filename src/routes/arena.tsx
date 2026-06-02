@@ -74,6 +74,8 @@ function ArenaPage() {
   // STEM Boss Raid States
   const [activeBoss, setActiveBoss] = useState<Boss | null>(null);
   const [bossAttackFlash, setBossAttackFlash] = useState(false);
+  const [lobbyShield, setLobbyShield] = useState(100);
+  const [screenFlashRed, setScreenFlashRed] = useState(false);
   
   // Friends State
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -184,6 +186,12 @@ function ArenaPage() {
         try {
           const storedF = localStorage.getItem(`stemos_friends_${data.session.user.id}`);
           if (storedF) setFriends(JSON.parse(storedF));
+        } catch {}
+
+        // Load global chat messages from localStorage
+        try {
+          const storedChat = localStorage.getItem("stemos_arena_global_chat");
+          if (storedChat) setMessages(JSON.parse(storedChat));
         } catch {}
       }
     })();
@@ -309,7 +317,10 @@ function ArenaPage() {
 
   // Real-time ticking boss countdown timer
   useEffect(() => {
-    if (!activeBoss) return;
+    if (!activeBoss) {
+      setLobbyShield(100);
+      return;
+    }
     const timer = setInterval(() => {
       setActiveBoss(prev => {
         if (!prev) return null;
@@ -319,7 +330,45 @@ function ArenaPage() {
           setActiveQuestion(null);
           return null;
         }
-        return { ...prev, timer: prev.timer - 1 };
+        
+        const nextTimer = prev.timer - 1;
+        // Boss Attacks every 15 seconds!
+        if (nextTimer % 15 === 0 && nextTimer > 0) {
+          const attacks = [
+            "unleashed an Algebraic Storm",
+            "fired a Quantum Entropy Beam",
+            "triggered a Gravity Disruption wave",
+            "cast a Thermodynamics Heatwave"
+          ];
+          const attackMove = attacks[Math.floor(Math.random() * attacks.length)];
+          
+          setScreenFlashRed(true);
+          setTimeout(() => setScreenFlashRed(false), 500);
+
+          setLobbyShield(s => {
+            const nextShield = Math.max(s - 15, 0);
+            if (nextShield === 0) {
+              clearInterval(timer);
+              toast.error(`☠️ DEFEATED! The ${prev.name} has shattered your lobby shield!`);
+              setActiveQuestion(null);
+              // Send defeat message
+              const defeatMsg = {
+                id: Math.random().toString(),
+                user_id: "sys",
+                username: "Boss Raid Bot",
+                content: `❌ RAID DEFEATED! The ${prev.name} has shattered the lobby shield! The raid party has been wiped out.`,
+                isSystem: true,
+                action: "question_solved"
+              };
+              channelRef.current?.send({ type: "broadcast", event: "system", payload: defeatMsg });
+              return 100;
+            }
+            toast.warning(`⚠️ BOSS ATTACK! The ${prev.name} ${attackMove}! -15 Lobby Shield!`);
+            return nextShield;
+          });
+        }
+
+        return { ...prev, timer: nextTimer };
       });
     }, 1000);
     return () => clearInterval(timer);
@@ -332,6 +381,17 @@ function ArenaPage() {
   useEffect(() => {
     if (privateScrollRef.current) privateScrollRef.current.scrollTop = privateScrollRef.current.scrollHeight;
   }, [privateMessages, activePrivateChat]);
+
+  // Save global chat messages to localStorage to persist after page refreshes
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        localStorage.setItem("stemos_arena_global_chat", JSON.stringify(messages.slice(-50)));
+      } catch (err) {
+        console.error("Failed to save arena chat to localStorage:", err);
+      }
+    }
+  }, [messages]);
 
   const checkModeration = async (text: string) => {
     const res = await fetch("/api/moderate-chat", {
@@ -403,8 +463,27 @@ function ArenaPage() {
           user_id: session.user.id, 
           subject: `Arena Boss Strike: ${activeBoss.name}`, 
           score: 1, 
-          xp_earned: 21 
+          xp_earned: 21,
+          total_questions: 1,
+          difficulty: "Hard"
         });
+
+        // 3. Update Profiles total_xp and emit dynamic update!
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("total_xp")
+            .eq("id", session.user.id)
+            .single();
+          const currentXp = profile?.total_xp || 0;
+          await supabase
+            .from("profiles")
+            .update({ total_xp: currentXp + 21 })
+            .eq("id", session.user.id);
+          window.dispatchEvent(new Event("stemos_xp_updated"));
+        } catch (err) {
+          console.error("Failed to increment user XP:", err);
+        }
 
         // Check if this strike fully defeats the boss (since current HP inside state is before subtraction)
         if (activeBoss.hp <= 20) {
@@ -417,6 +496,33 @@ function ArenaPage() {
             action: "question_solved" 
           };
           channelRef.current?.send({ type: "broadcast", event: "system", payload: winMsg });
+
+          // Award Victory Shared XP!
+          await supabase.from("quiz_attempts").insert({ 
+            user_id: session.user.id, 
+            subject: `Arena Raid Win: ${activeBoss.name}`, 
+            score: 1, 
+            xp_earned: 100,
+            total_questions: 1,
+            difficulty: "Hard"
+          });
+          
+          try {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("total_xp")
+              .eq("id", session.user.id)
+              .single();
+            const currentXp = profile?.total_xp || 0;
+            await supabase
+              .from("profiles")
+              .update({ total_xp: currentXp + 100 })
+              .eq("id", session.user.id);
+            window.dispatchEvent(new Event("stemos_xp_updated"));
+          } catch (err) {
+            console.error("Failed to increment victory XP:", err);
+          }
+
           setActiveBoss(null);
           setActiveQuestion(null);
           toast.success("Calculus solved! Boss defeated! +100 XP bonus!");
@@ -449,14 +555,57 @@ function ArenaPage() {
           user_id: session.user.id, 
           subject: "Arena Rapid Fire MCQ", 
           score: 1, 
-          xp_earned: 21 
+          xp_earned: 21,
+          total_questions: 1,
+          difficulty: "Hard"
         });
+
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("total_xp")
+            .eq("id", session.user.id)
+            .single();
+          const currentXp = profile?.total_xp || 0;
+          await supabase
+            .from("profiles")
+            .update({ total_xp: currentXp + 21 })
+            .eq("id", session.user.id);
+          window.dispatchEvent(new Event("stemos_xp_updated"));
+        } catch (err) {
+          console.error("Failed to increment user XP:", err);
+        }
         
         channelRef.current?.send({ type: "broadcast", event: "system", payload: winMsg });
         toast.success("Correct answer! +21 points!");
       }
     } else {
-      toast.error("Incorrect! Try another option.");
+      if (activeBoss) {
+        // Counter-attack on wrong answer choice!
+        setLobbyShield(s => {
+          const nextShield = Math.max(s - 10, 0);
+          if (nextShield === 0) {
+            toast.error(`☠️ DEFEATED! Counter-attack shattered the lobby shield!`);
+            setActiveQuestion(null);
+            setActiveBoss(null);
+            
+            const defeatMsg = {
+              id: Math.random().toString(),
+              user_id: "sys",
+              username: "Boss Raid Bot",
+              content: `❌ RAID DEFEATED! The party was wiped out by a devastating boss counter-attack on an incorrect answer.`,
+              isSystem: true,
+              action: "question_solved"
+            };
+            channelRef.current?.send({ type: "broadcast", event: "system", payload: defeatMsg });
+            return 100;
+          }
+          toast.error(`💥 COUNTER-ATTACK! Wrong choice! The ${activeBoss.name} strikes the party shield for 10 damage!`);
+          return nextShield;
+        });
+      } else {
+        toast.error("Incorrect! Try another option.");
+      }
     }
   };
 
@@ -478,6 +627,18 @@ function ArenaPage() {
 
   return (
     <Layout>
+      {/* Red screen flash when boss attacks */}
+      <AnimatePresence>
+        {screenFlashRed && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.25 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-red-600 z-50 pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
+
       <div className="mx-auto max-w-7xl px-4 py-4 md:py-6 h-[calc(100vh-100px)] md:h-[calc(100vh-80px)] flex flex-col md:flex-row gap-4 md:gap-6 relative">
         
         {/* Mobile Navigation Tab Bar (Visible only on mobile) */}
@@ -702,6 +863,17 @@ function ArenaPage() {
                       />
                       <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-foreground drop-shadow font-mono select-none">
                         {activeBoss.hp} / {activeBoss.maxHp} HP
+                      </span>
+                    </div>
+
+                    {/* Glowing Lobby Shield Bar */}
+                    <div className="w-full bg-secondary h-4 rounded-full overflow-hidden border border-cyan-500/15 relative shrink-0">
+                      <div 
+                        className="h-full bg-gradient-to-r from-cyan-600 to-teal-500 transition-all duration-300 shadow-glow" 
+                        style={{ width: `${lobbyShield}%` }}
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-foreground drop-shadow font-mono select-none">
+                        🛡️ LOBBY SHIELD: {lobbyShield} / 100 HP
                       </span>
                     </div>
                   </div>
