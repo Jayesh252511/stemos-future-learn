@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   Sparkles, Send, Atom, Sigma, FlaskConical, Code2, Plus, MessageSquare,
   BrainCircuit, Lightbulb, ListChecks, Globe2, FileText, Square,
-  BookOpen, Zap, Copy, Check, ChevronDown
+  BookOpen, Zap, Copy, Check, ChevronDown, Mic, Volume2
 } from "lucide-react";
 import { Layout } from "@/components/site/Layout";
 import { streamChat, type ChatMsg } from "@/lib/ai-stream";
@@ -75,6 +75,102 @@ function TutorPage() {
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Voice Mode States
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Stop speaking on component unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const toggleRecording = () => {
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Speech recognition is not supported in this browser. Try Chrome or Safari.");
+      return;
+    }
+
+    if (recording) {
+      recognitionRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = lang === "es" ? "es-ES" : lang === "fr" ? "fr-FR" : "en-US";
+
+      rec.onstart = () => setRecording(true);
+      rec.onend = () => setRecording(false);
+      rec.onerror = (e: any) => {
+        console.error("Speech recognition error:", e);
+        setRecording(false);
+      };
+      rec.onresult = (event: any) => {
+        const resultText = event.results[0][0].transcript;
+        setInput(prev => prev + " " + resultText);
+      };
+      recognitionRef.current = rec;
+    }
+
+    // Stop speaking when user starts recording
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setSpeaking(false);
+    }
+
+    recognitionRef.current.start();
+  };
+
+  const speakText = async (text: string) => {
+    if (!voiceEnabled) return;
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      setSpeaking(true);
+      const resp = await fetch("/api/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+
+      if (!resp.ok) {
+        throw new Error("Failed to generate speech");
+      }
+
+      const audioBlob = await resp.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      audio.onended = () => setSpeaking(false);
+      audio.onerror = () => setSpeaking(false);
+      
+      audioRef.current = audio;
+      audio.play();
+
+    } catch (err) {
+      console.error("ElevenLabs vocal output error:", err);
+      setSpeaking(false);
+    }
+  };
+
   useEffect(() => {
     setConversations(loadConversations());
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -139,6 +235,13 @@ function TutorPage() {
     // Build locale string: use full language name for non-English
     const localeStr = lang !== "en" ? AI_LANG_NAME[lang] : undefined;
 
+    // Interrupt speech if currently speaking when sending a new message
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setSpeaking(false);
+    }
+
     try {
       await streamChat({
         messages: next,
@@ -149,6 +252,11 @@ function TutorPage() {
       const finalMsgs = [...next, { role: "assistant" as const, content: acc }];
       setMessages(finalMsgs);
       persist(finalMsgs);
+      
+      // Auto speak when response finishes
+      if (voiceEnabled) {
+        speakText(acc);
+      }
     } catch (e: any) {
       if (e?.name === "AbortError") {
         if (acc) {
@@ -167,18 +275,40 @@ function TutorPage() {
     }
   };
 
-  const stop = () => abortRef.current?.abort();
+  const stop = () => {
+    abortRef.current?.abort();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setSpeaking(false);
+    }
+  };
   const newChat = () => {
     abortRef.current?.abort();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setSpeaking(false);
+    }
     setMessages([]); setActiveId(null); setStreamed("");
     setSuggestionIdx(i => i + 1);
   };
   const openChat = (c: Conversation) => {
     abortRef.current?.abort();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setSpeaking(false);
+    }
     setActiveId(c.id); setMessages(c.messages); setStreamed("");
   };
   const deleteChat = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setSpeaking(false);
+    }
     setConversations(prev => { const list = prev.filter(c => c.id !== id); saveConversations(list); return list; });
     if (activeId === id) { setMessages([]); setActiveId(null); }
   };
@@ -226,12 +356,7 @@ function TutorPage() {
           </div>
         </aside>
 
-        <section className="flex flex-col rounded-2xl border bg-surface overflow-hidden relative">
-          <div className="absolute inset-x-0 top-0 h-40 bg-gradient-mesh opacity-60 pointer-events-none" />
-          {/* Subtle doodles */}
-          <DoodleAtom className="absolute top-8 right-8 text-primary" size={48} opacity={0.08} />
-          <DoodleCode className="absolute top-12 right-20 text-cyan-500" size={40} opacity={0.1} />
-
+        <section className="flex flex-col rounded-2xl border bg-card shadow-soft overflow-hidden h-full">
           <div className="relative border-b px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-lg bg-gradient-hero flex items-center justify-center shadow-glow">
@@ -244,17 +369,40 @@ function TutorPage() {
                 </div>
               </div>
             </div>
-            <div className="hidden sm:flex gap-1.5">
-              {topics.map(tp => {
-                const style = topicStyles[tp.key];
-                return (
-                  <button key={tp.key} onClick={() => send(`${tt("helpMeWith")} ${tp.name}.`)}
-                    disabled={streaming}
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs hover:opacity-80 transition disabled:opacity-50 ${style.bg}`}>
-                    <style.icon className={`h-3.5 w-3.5 ${style.color}`} /> {tp.name}
-                  </button>
-                );
-              })}
+
+            <div className="flex items-center gap-4">
+              {/* Voice Mode Toggle */}
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold select-none text-muted-foreground hover:text-foreground transition">
+                <Volume2 className={`h-4 w-4 ${voiceEnabled ? "text-primary animate-pulse" : "text-muted-foreground"}`} />
+                <span>Voice Mode</span>
+                <input
+                  type="checkbox"
+                  checked={voiceEnabled}
+                  onChange={(e) => {
+                    setVoiceEnabled(e.target.checked);
+                    if (!e.target.checked && audioRef.current) {
+                      audioRef.current.pause();
+                      audioRef.current = null;
+                      setSpeaking(false);
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="relative w-8 h-4 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+              </label>
+
+              <div className="hidden sm:flex gap-1.5">
+                {topics.map(tp => {
+                  const style = topicStyles[tp.key];
+                  return (
+                    <button key={tp.key} onClick={() => send(`${tt("helpMeWith")} ${tp.name}.`)}
+                      disabled={streaming}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs hover:opacity-80 transition disabled:opacity-50 ${style.bg}`}>
+                      <style.icon className={`h-3.5 w-3.5 ${style.color}`} /> {tp.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -327,6 +475,21 @@ function TutorPage() {
           <div className="relative border-t bg-surface p-4">
             <form onSubmit={e => { e.preventDefault(); send(input); }}
               className="flex items-end gap-2 rounded-2xl border bg-card p-2 shadow-soft focus-within:ring-glow transition">
+              
+              {/* Vocal input mic button */}
+              <button
+                type="button"
+                onClick={toggleRecording}
+                className={`h-9 w-9 rounded-xl flex items-center justify-center transition shrink-0 border ${
+                  recording 
+                    ? "bg-red-500 text-white border-red-500 animate-pulse shadow-glow-red" 
+                    : "bg-surface hover:bg-secondary text-muted-foreground hover:text-foreground"
+                }`}
+                title="Vocal Input (Speech to Text)"
+              >
+                <Mic className="h-4 w-4" />
+              </button>
+
               <textarea ref={textareaRef} value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}

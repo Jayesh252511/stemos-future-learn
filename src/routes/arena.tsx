@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Layout } from "@/components/site/Layout";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, Zap, ShieldAlert, UserPlus, Users, MessageSquare, Check, X } from "lucide-react";
+import { Send, Zap, ShieldAlert, UserPlus, Users, MessageSquare, Check, X, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -14,11 +14,21 @@ export const Route = createFileRoute("/arena")({
 type Message = { id: string; user_id: string; username: string; content: string; isSystem?: boolean; };
 type Friend = { id: string; username: string };
 
+type Boss = {
+  name: string;
+  maxHp: number;
+  hp: number;
+  avatar: string;
+  element: string;
+  timer: number;
+};
+
 type MCQQuestion = {
   q: string;
   options: string[];
   a: string; // "A" | "B" | "C" | "D"
   position?: { top: string; left: string; };
+  boss?: Boss;
 };
 
 const RAPID_FIRE_QUESTIONS: MCQQuestion[] = [
@@ -60,6 +70,10 @@ function ArenaPage() {
   
   // Rapid Fire State
   const [activeQuestion, setActiveQuestion] = useState<MCQQuestion | null>(null);
+  
+  // STEM Boss Raid States
+  const [activeBoss, setActiveBoss] = useState<Boss | null>(null);
+  const [bossAttackFlash, setBossAttackFlash] = useState(false);
   
   // Friends State
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -110,10 +124,31 @@ function ArenaPage() {
         setMessages(prev => [...prev, payload.payload]);
         if (payload.payload.action === "question_solved") {
           setActiveQuestion(null);
+          setActiveBoss(null);
         }
       })
       .on("broadcast", { event: "rapid_fire" }, (payload) => {
         setActiveQuestion(payload.payload);
+        if (payload.payload.boss) {
+          setActiveBoss(payload.payload.boss);
+        } else {
+          setActiveBoss(null);
+        }
+      })
+      .on("broadcast", { event: "boss_damage" }, (payload) => {
+        // Trigger visual card shake
+        setBossAttackFlash(true);
+        setTimeout(() => setBossAttackFlash(false), 500);
+
+        setActiveBoss(prev => {
+          if (!prev) return null;
+          const newHp = Math.max(prev.hp - payload.payload.damage, 0);
+          if (newHp === 0) {
+            toast.success(`🏆 The lobby has defeated the ${prev.name}!`);
+            return null;
+          }
+          return { ...prev, hp: newHp };
+        });
       })
       .on("broadcast", { event: "friend_request" }, (payload) => {
         supabase.auth.getSession().then(({ data }) => {
@@ -173,6 +208,28 @@ function ArenaPage() {
         const left = `${Math.floor(Math.random() * 50) + 10}%`;
         q.position = { top, left };
 
+        // 50% chance of spawning a STEM Boss Raid instead of standard MCQ
+        const isBossRaid = Math.random() < 0.5;
+        if (isBossRaid) {
+          const bossNames = ["Calculus Dragon", "Quantum Leviathan", "Entropy Behemoth"];
+          const bossElements = ["Mathematics", "Physics", "Thermodynamics"];
+          const bossAvatars = ["🐉", "🐋", "👹"];
+          const idx = Math.floor(Math.random() * bossNames.length);
+
+          const boss = {
+            name: bossNames[idx],
+            maxHp: 100,
+            hp: 100,
+            avatar: bossAvatars[idx],
+            element: bossElements[idx],
+            timer: 60
+          };
+          q.boss = boss;
+          setActiveBoss(boss);
+        } else {
+          setActiveBoss(null);
+        }
+
         channel.send({ type: "broadcast", event: "rapid_fire", payload: q });
         setActiveQuestion(q);
       } catch (err) {
@@ -183,6 +240,22 @@ function ArenaPage() {
         const top = `${Math.floor(Math.random() * 50) + 15}%`;
         const left = `${Math.floor(Math.random() * 50) + 10}%`;
         q.position = { top, left };
+        
+        const isBossRaid = Math.random() < 0.5;
+        if (isBossRaid) {
+          const boss = {
+            name: "Calculus Dragon",
+            maxHp: 100,
+            hp: 100,
+            avatar: "🐉",
+            element: "Mathematics",
+            timer: 60
+          };
+          q.boss = boss;
+          setActiveBoss(boss);
+        } else {
+          setActiveBoss(null);
+        }
         
         channel.send({ type: "broadcast", event: "rapid_fire", payload: q });
         setActiveQuestion(q);
@@ -199,6 +272,24 @@ function ArenaPage() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Real-time ticking boss countdown timer
+  useEffect(() => {
+    if (!activeBoss) return;
+    const timer = setInterval(() => {
+      setActiveBoss(prev => {
+        if (!prev) return null;
+        if (prev.timer <= 1) {
+          clearInterval(timer);
+          toast.error(`😢 Time ran out! The ${prev.name} has escaped!`);
+          setActiveQuestion(null);
+          return null;
+        }
+        return { ...prev, timer: prev.timer - 1 };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [activeBoss]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -262,28 +353,74 @@ function ArenaPage() {
     if (!activeQuestion || !session) return;
 
     if (choice === activeQuestion.a) {
-      setActiveQuestion(null); // Hide question instantly for blazing fast visual response!
       const optionIndex = activeQuestion.a.charCodeAt(0) - 65;
       const optionText = activeQuestion.options[optionIndex] || activeQuestion.a;
-      const winMsg = { 
-        id: Math.random().toString(), 
-        user_id: "sys", 
-        username: "Rapid Fire Bot", 
-        content: `🎉 ${session.user.email?.split('@')[0]} answered correctly! Option ${activeQuestion.a}: "${optionText}". +21 XP!`, 
-        isSystem: true, 
-        action: "question_solved" 
-      };
-      
-      // Award exactly 21 XP/points!
-      await supabase.from("quiz_attempts").insert({ 
-        user_id: session.user.id, 
-        subject: "Arena Rapid Fire MCQ", 
-        score: 1, 
-        xp_earned: 21 
-      });
-      
-      channelRef.current?.send({ type: "broadcast", event: "system", payload: winMsg });
-      toast.success("Correct answer! +21 points!");
+
+      if (activeBoss) {
+        // 1. Send boss damage broadcast to everyone
+        channelRef.current?.send({ 
+          type: "broadcast", 
+          event: "boss_damage", 
+          payload: { damage: 20, from_username: session.user.email?.split('@')[0] } 
+        });
+
+        // 2. Award exactly 21 XP/points for the successful strike!
+        await supabase.from("quiz_attempts").insert({ 
+          user_id: session.user.id, 
+          subject: `Arena Boss Strike: ${activeBoss.name}`, 
+          score: 1, 
+          xp_earned: 21 
+        });
+
+        // Check if this strike fully defeats the boss (since current HP inside state is before subtraction)
+        if (activeBoss.hp <= 20) {
+          const winMsg = { 
+            id: Math.random().toString(), 
+            user_id: "sys", 
+            username: "Boss Raid Bot", 
+            content: `🏆 LOBBY VICTORY! The ${activeBoss.name} has been defeated! Final blow dealt by ${session.user.email?.split('@')[0]}. Everyone earns a massive +100 XP shared bonus!`, 
+            isSystem: true, 
+            action: "question_solved" 
+          };
+          channelRef.current?.send({ type: "broadcast", event: "system", payload: winMsg });
+          setActiveBoss(null);
+          setActiveQuestion(null);
+          toast.success("Calculus solved! Boss defeated! +100 XP bonus!");
+        } else {
+          // Send attack system message in general log
+          const attackMsg = {
+            id: Math.random().toString(),
+            user_id: "sys",
+            username: "Boss Raid Bot",
+            content: `💥 ${session.user.email?.split('@')[0]} dealt 20 damage to the ${activeBoss.name}! (${activeBoss.hp - 20}/${activeBoss.maxHp} HP left)`,
+            isSystem: true
+          };
+          channelRef.current?.send({ type: "broadcast", event: "system", payload: attackMsg });
+          toast.success("Correct answer! Dealt 20 damage to the boss!");
+        }
+      } else {
+        // Standard MCQ Rapid Fire solved
+        setActiveQuestion(null); // Hide question instantly for blazing fast visual response!
+        const winMsg = { 
+          id: Math.random().toString(), 
+          user_id: "sys", 
+          username: "Rapid Fire Bot", 
+          content: `🎉 ${session.user.email?.split('@')[0]} answered correctly! Option ${activeQuestion.a}: "${optionText}". +21 XP!`, 
+          isSystem: true, 
+          action: "question_solved" 
+        };
+        
+        // Award exactly 21 XP/points!
+        await supabase.from("quiz_attempts").insert({ 
+          user_id: session.user.id, 
+          subject: "Arena Rapid Fire MCQ", 
+          score: 1, 
+          xp_earned: 21 
+        });
+        
+        channelRef.current?.send({ type: "broadcast", event: "system", payload: winMsg });
+        toast.success("Correct answer! +21 points!");
+      }
     } else {
       toast.error("Incorrect! Try another option.");
     }
@@ -469,16 +606,20 @@ function ArenaPage() {
           )}
         </AnimatePresence>
 
-        {/* Rapid Fire Overlay Panel */}
+        {/* Rapid Fire & STEM Boss Overlay Panel */}
         <AnimatePresence>
           {activeQuestion && (
             <motion.div 
               initial={{ opacity: 0, scale: 0.8 }} 
-              animate={{ opacity: 1, scale: 1 }} 
+              animate={
+                bossAttackFlash 
+                  ? { x: [-10, 10, -10, 10, 0], scale: [1, 1.05, 0.95, 1.02, 1], transition: { duration: 0.4 } } 
+                  : { opacity: 1, scale: 1 }
+              }
               exit={{ opacity: 0, scale: 0.8 }} 
-              className={`absolute bg-gradient-to-br from-amber-500 to-orange-600 text-white p-[2px] rounded-[2rem] shadow-glow z-30 ${
+              className={`absolute bg-gradient-to-br p-[2px] rounded-[2rem] shadow-glow z-30 transition-all duration-300 ${
                 isMobile ? "fixed left-4 right-4 w-auto" : "w-80"
-              }`}
+              } ${activeBoss ? "from-red-500 via-orange-500 to-amber-500" : "from-amber-500 to-orange-600"}`}
               style={
                 isMobile
                   ? { bottom: "16px", top: "auto", left: "16px", right: "16px" }
@@ -491,10 +632,43 @@ function ArenaPage() {
             >
               <div className="bg-card text-foreground h-full w-full rounded-[calc(2rem-2px)] p-5 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Zap className="h-24 w-24" /></div>
-                <div className="text-xs font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1.5 mb-2">
-                  <Zap className="h-3.5 w-3.5 fill-current" /> Rapid Fire MCQ
-                </div>
-                <h3 className="font-display font-bold text-sm leading-snug mb-4">{activeQuestion.q}</h3>
+                
+                {/* STEM Boss Raid Header details */}
+                {activeBoss ? (
+                  <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-2xl p-3 flex flex-col gap-2 relative overflow-hidden animate-pulse">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl animate-bounce shrink-0">{activeBoss.avatar}</span>
+                        <div className="min-w-0">
+                          <h4 className="text-[10px] font-black text-red-500 uppercase tracking-widest leading-none">STEM BOSS RAID</h4>
+                          <h3 className="font-display font-extrabold text-sm text-foreground mt-1 leading-none truncate">{activeBoss.name}</h3>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 bg-red-500/25 text-red-500 px-2 py-1 rounded-lg text-xs font-black font-mono shrink-0">
+                        <Clock className="h-3.5 w-3.5 animate-spin" /> {activeBoss.timer}s
+                      </div>
+                    </div>
+                    
+                    {/* Glowing Health Bar */}
+                    <div className="w-full bg-secondary h-4 rounded-full overflow-hidden border border-red-500/15 relative shrink-0">
+                      <div 
+                        className="h-full bg-gradient-to-r from-red-600 to-rose-500 transition-all duration-300 shadow-glow" 
+                        style={{ width: `${(activeBoss.hp / activeBoss.maxHp) * 100}%` }}
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-foreground drop-shadow font-mono select-none">
+                        {activeBoss.hp} / {activeBoss.maxHp} HP
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1.5 mb-2">
+                    <Zap className="h-3.5 w-3.5 fill-current" /> Rapid Fire MCQ
+                  </div>
+                )}
+
+                <h3 className="font-display font-bold text-xs leading-snug mb-4">
+                  {activeBoss ? `🛡️ WEAKNESS: ${activeQuestion.q}` : activeQuestion.q}
+                </h3>
                 
                 <div className="space-y-2">
                   {activeQuestion.options.map((opt: string, idx: number) => {
@@ -503,9 +677,17 @@ function ArenaPage() {
                       <button
                         key={idx}
                         onClick={() => handleRapidFireChoice(label)}
-                        className="w-full text-left bg-background hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500 px-4 py-2.5 rounded-xl text-xs font-medium transition flex items-center gap-2 group text-foreground cursor-pointer"
+                        className={`w-full text-left bg-background border px-4 py-2.5 rounded-xl text-xs font-medium transition flex items-center gap-2 group text-foreground cursor-pointer ${
+                          activeBoss 
+                            ? "hover:bg-red-500/10 border-red-500/20 hover:border-red-500" 
+                            : "hover:bg-amber-500/10 border-amber-500/20 hover:border-amber-500"
+                        }`}
                       >
-                        <span className="h-6 w-6 rounded-lg bg-amber-500/10 text-amber-600 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center font-bold text-xs shrink-0 transition">
+                        <span className={`h-6 w-6 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition ${
+                          activeBoss
+                            ? "bg-red-500/10 text-red-500 group-hover:bg-red-500 group-hover:text-white"
+                            : "bg-amber-500/10 text-amber-600 group-hover:bg-amber-500 group-hover:text-white"
+                        }`}>
                           {label}
                         </span>
                         <span className="truncate">{opt}</span>

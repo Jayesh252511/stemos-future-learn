@@ -20,6 +20,7 @@ import { Route as LabRouteImport } from './routes/lab'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ArenaRouteImport } from './routes/arena'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSpeakRouteImport } from './routes/api/speak'
 import { Route as ApiQuizRouteImport } from './routes/api/quiz'
 import { Route as ApiModerateChatRouteImport } from './routes/api/moderate-chat'
 import { Route as ApiGenerateQuestionRouteImport } from './routes/api/generate-question'
@@ -81,6 +82,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSpeakRoute = ApiSpeakRouteImport.update({
+  id: '/api/speak',
+  path: '/api/speak',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiQuizRoute = ApiQuizRouteImport.update({
   id: '/api/quiz',
   path: '/api/quiz',
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/api/generate-question': typeof ApiGenerateQuestionRoute
   '/api/moderate-chat': typeof ApiModerateChatRoute
   '/api/quiz': typeof ApiQuizRoute
+  '/api/speak': typeof ApiSpeakRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByTo {
   '/api/generate-question': typeof ApiGenerateQuestionRoute
   '/api/moderate-chat': typeof ApiModerateChatRoute
   '/api/quiz': typeof ApiQuizRoute
+  '/api/speak': typeof ApiSpeakRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/api/generate-question': typeof ApiGenerateQuestionRoute
   '/api/moderate-chat': typeof ApiModerateChatRoute
   '/api/quiz': typeof ApiQuizRoute
+  '/api/speak': typeof ApiSpeakRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/api/generate-question'
     | '/api/moderate-chat'
     | '/api/quiz'
+    | '/api/speak'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/api/generate-question'
     | '/api/moderate-chat'
     | '/api/quiz'
+    | '/api/speak'
   id:
     | '__root__'
     | '/'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/api/generate-question'
     | '/api/moderate-chat'
     | '/api/quiz'
+    | '/api/speak'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -236,6 +248,7 @@ export interface RootRouteChildren {
   ApiGenerateQuestionRoute: typeof ApiGenerateQuestionRoute
   ApiModerateChatRoute: typeof ApiModerateChatRoute
   ApiQuizRoute: typeof ApiQuizRoute
+  ApiSpeakRoute: typeof ApiSpeakRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -317,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/speak': {
+      id: '/api/speak'
+      path: '/api/speak'
+      fullPath: '/api/speak'
+      preLoaderRoute: typeof ApiSpeakRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/quiz': {
       id: '/api/quiz'
       path: '/api/quiz'
@@ -372,6 +392,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGenerateQuestionRoute: ApiGenerateQuestionRoute,
   ApiModerateChatRoute: ApiModerateChatRoute,
   ApiQuizRoute: ApiQuizRoute,
+  ApiSpeakRoute: ApiSpeakRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
