@@ -9,8 +9,8 @@ import ws from 'ws'
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
     
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+    const SUPABASE_URL = process.env.SUPABASE_URL || "https://xdlbcrquwdgowxsqsxti.supabase.co";
+    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkbGJjcnF1d2Rnb3d4c3FzeHRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NzA3NjAsImV4cCI6MjA5NTM0Njc2MH0.YxqL2HcwwKWBiRLu2x3cpQS_hVBfQ5TByx_W24wngOg";
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       const missing = [
