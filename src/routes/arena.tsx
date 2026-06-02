@@ -99,6 +99,82 @@ function ArenaPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const privateScrollRef = useRef<HTMLDivElement>(null);
 
+  const activeQuestionRef = useRef<MCQQuestion | null>(null);
+  const activeBossRef = useRef<Boss | null>(null);
+
+  useEffect(() => {
+    activeQuestionRef.current = activeQuestion;
+  }, [activeQuestion]);
+
+  useEffect(() => {
+    activeBossRef.current = activeBoss;
+  }, [activeBoss]);
+
+  const triggerNewQuestion = async () => {
+    try {
+      const res = await fetch("/api/generate-question");
+      if (!res.ok) throw new Error("Failed to fetch generated question");
+      const q = await res.json();
+      
+      // Dynamic random position in Arena viewport (safe boundaries: 15-65% top, 10-60% left)
+      const top = `${Math.floor(Math.random() * 50) + 15}%`;
+      const left = `${Math.floor(Math.random() * 50) + 10}%`;
+      q.position = { top, left };
+
+      // 50% chance of spawning a STEM Boss Raid instead of standard MCQ
+      const isBossRaid = Math.random() < 0.5;
+      if (isBossRaid) {
+        const bossNames = ["Calculus Dragon", "Quantum Leviathan", "Entropy Behemoth"];
+        const bossElements = ["Mathematics", "Physics", "Thermodynamics"];
+        const bossAvatars = ["🐉", "🐋", "👹"];
+        const idx = Math.floor(Math.random() * bossNames.length);
+
+        const boss = {
+          name: bossNames[idx],
+          maxHp: 100,
+          hp: 100,
+          avatar: bossAvatars[idx],
+          element: bossElements[idx],
+          timer: 60
+        };
+        q.boss = boss;
+        setActiveBoss(boss);
+      } else {
+        setActiveBoss(null);
+      }
+
+      channelRef.current?.send({ type: "broadcast", event: "rapid_fire", payload: q });
+      setActiveQuestion(q);
+    } catch (err) {
+      console.error("Failed to generate dynamic question:", err);
+      // Fallback to static MCQs
+      const baseQ = RAPID_FIRE_QUESTIONS[Math.floor(Math.random() * RAPID_FIRE_QUESTIONS.length)];
+      const q = { ...baseQ };
+      const top = `${Math.floor(Math.random() * 50) + 15}%`;
+      const left = `${Math.floor(Math.random() * 50) + 10}%`;
+      q.position = { top, left };
+      
+      const isBossRaid = Math.random() < 0.5;
+      if (isBossRaid) {
+        const boss = {
+          name: "Calculus Dragon",
+          maxHp: 100,
+          hp: 100,
+          avatar: "🐉",
+          element: "Mathematics",
+          timer: 60
+        };
+        q.boss = boss;
+        setActiveBoss(boss);
+      } else {
+        setActiveBoss(null);
+      }
+      
+      channelRef.current?.send({ type: "broadcast", event: "rapid_fire", payload: q });
+      setActiveQuestion(q);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getSession();
@@ -188,86 +264,44 @@ function ArenaPage() {
       .on("presence", { event: "sync" }, () => {
         setOnlineCount(Object.keys(channel.presenceState()).length || 1);
       })
+      .on("broadcast", { event: "request_state" }, () => {
+        if (activeQuestionRef.current) {
+          channel.send({
+            type: "broadcast",
+            event: "respond_state",
+            payload: {
+              activeQuestion: activeQuestionRef.current,
+              activeBoss: activeBossRef.current
+            }
+          });
+        }
+      })
+      .on("broadcast", { event: "respond_state" }, (payload) => {
+        if (!activeQuestionRef.current && payload.payload.activeQuestion) {
+          setActiveQuestion(payload.payload.activeQuestion);
+          if (payload.payload.activeBoss) {
+            setActiveBoss(payload.payload.activeBoss);
+          }
+        }
+      })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({ online_at: new Date().toISOString() });
           setMessages([{ id: "sys1", user_id: "sys", username: "AI Moderator", content: "Welcome to the Arena. The AI is monitoring all chats to ensure study-focused topics only.", isSystem: true }]);
+          // Request current active question/boss state from other clients
+          channel.send({ type: "broadcast", event: "request_state", payload: {} });
         }
       });
 
     channelRef.current = channel;
 
-    const triggerNewQuestion = async () => {
-      try {
-        const res = await fetch("/api/generate-question");
-        if (!res.ok) throw new Error("Failed to fetch generated question");
-        const q = await res.json();
-        
-        // Dynamic random position in Arena viewport (safe boundaries: 15-65% top, 10-60% left)
-        const top = `${Math.floor(Math.random() * 50) + 15}%`;
-        const left = `${Math.floor(Math.random() * 50) + 10}%`;
-        q.position = { top, left };
-
-        // 50% chance of spawning a STEM Boss Raid instead of standard MCQ
-        const isBossRaid = Math.random() < 0.5;
-        if (isBossRaid) {
-          const bossNames = ["Calculus Dragon", "Quantum Leviathan", "Entropy Behemoth"];
-          const bossElements = ["Mathematics", "Physics", "Thermodynamics"];
-          const bossAvatars = ["🐉", "🐋", "👹"];
-          const idx = Math.floor(Math.random() * bossNames.length);
-
-          const boss = {
-            name: bossNames[idx],
-            maxHp: 100,
-            hp: 100,
-            avatar: bossAvatars[idx],
-            element: bossElements[idx],
-            timer: 60
-          };
-          q.boss = boss;
-          setActiveBoss(boss);
-        } else {
-          setActiveBoss(null);
-        }
-
-        channel.send({ type: "broadcast", event: "rapid_fire", payload: q });
-        setActiveQuestion(q);
-      } catch (err) {
-        console.error("Failed to generate dynamic question:", err);
-        // Fallback to static MCQs
-        const baseQ = RAPID_FIRE_QUESTIONS[Math.floor(Math.random() * RAPID_FIRE_QUESTIONS.length)];
-        const q = { ...baseQ };
-        const top = `${Math.floor(Math.random() * 50) + 15}%`;
-        const left = `${Math.floor(Math.random() * 50) + 10}%`;
-        q.position = { top, left };
-        
-        const isBossRaid = Math.random() < 0.5;
-        if (isBossRaid) {
-          const boss = {
-            name: "Calculus Dragon",
-            maxHp: 100,
-            hp: 100,
-            avatar: "🐉",
-            element: "Mathematics",
-            timer: 60
-          };
-          q.boss = boss;
-          setActiveBoss(boss);
-        } else {
-          setActiveBoss(null);
-        }
-        
-        channel.send({ type: "broadcast", event: "rapid_fire", payload: q });
-        setActiveQuestion(q);
-      }
-    };
-
     // Initial trigger
-    setTimeout(triggerNewQuestion, 5000);
+    const timeout = setTimeout(triggerNewQuestion, 5000);
 
     const interval = setInterval(triggerNewQuestion, 60000); // Popup every 60s (1 minute)
 
     return () => {
+      clearTimeout(timeout);
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
@@ -520,9 +554,20 @@ function ArenaPage() {
                 <ShieldAlert className="h-3 w-3" /> AI Moderated Study-Only Zone
               </p>
             </div>
-            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{onlineCount} Online</span>
+            <div className="flex items-center gap-3">
+              <button 
+                type="button"
+                onClick={() => triggerNewQuestion()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/15 border border-primary/30 hover:bg-primary/25 text-primary text-xs font-bold rounded-full transition shadow-soft cursor-pointer hover:scale-105 active:scale-95 duration-200"
+                title="Immediately trigger a new AI MCQ or Collaborative STEM Boss Raid!"
+              >
+                <Zap className="h-3.5 w-3.5 fill-current animate-pulse text-primary" /> Spawn Raid
+              </button>
+
+              <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full shrink-0">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{onlineCount} Online</span>
+              </div>
             </div>
           </div>
 
