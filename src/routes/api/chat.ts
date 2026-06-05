@@ -16,9 +16,10 @@ export const Route = createFileRoute("/api/chat")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { messages, locale } = (await request.json()) as {
+          const { messages, locale, isVoiceMode } = (await request.json()) as {
             messages: { role: "user" | "assistant"; content: string }[];
             locale?: string;
+            isVoiceMode?: boolean;
           };
 
           if (!Array.isArray(messages) || messages.length === 0) {
@@ -41,7 +42,12 @@ export const Route = createFileRoute("/api/chat")({
             ? `\n\nLANGUAGE RULE (CRITICAL): You MUST respond ONLY in ${locale}. All explanations, examples, and text must be in ${locale}. Do NOT switch to English under any circumstances. Keep technical terms (like variable names, math symbols) in their universal form, but all natural language MUST be in ${locale}.`
             : "";
 
-          const SYSTEM = BASE_SYSTEM + langInstruction;
+          // Voice Mode instruction override: friendly, short, conversational
+          const voiceModeInstruction = isVoiceMode
+            ? `\n\nVOICE MODE INSTRUCTION (CRITICAL): The user is communicating via hands-free Voice Mode. You MUST keep your responses very short (maximum 1 to 3 sentences), highly conversational, friendly, and natural. Do NOT use bullet points, numbered lists, markdown styling, bold markers, or code snippets. Keep it purely natural, spoken-friendly text, as it will be read back via Text-to-Speech.`
+            : "";
+
+          const SYSTEM = BASE_SYSTEM + langInstruction + voiceModeInstruction;
 
           const baseUrl = process.env.TUTOR_BASE_URL || "https://api.groq.com/openai/v1/chat/completions";
           const primaryModel = process.env.TUTOR_MODEL || "llama-3.1-8b-instant";
