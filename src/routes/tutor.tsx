@@ -151,6 +151,7 @@ function TutorPage() {
         recognitionRef.current.stop();
       }
     } else {
+      interruptedRef.current = false;
       setVoiceState("idle");
       // Short delay for UI transition, then start listening
       setTimeout(() => {
@@ -160,7 +161,10 @@ function TutorPage() {
   };
 
   const startAutoListening = () => {
-    if (interruptedRef.current || !voiceEnabled) return;
+    // Reset interrupt flag when start listening is triggered
+    interruptedRef.current = false;
+    
+    if (!voiceEnabled) return;
     
     // Cancel active synthesis/playback before listening
     if (typeof window !== "undefined" && window.speechSynthesis) {
@@ -183,6 +187,11 @@ function TutorPage() {
     
     if (!recognitionRef.current) {
       initializeRecognition();
+    }
+    
+    // Dynamically update the language
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = lang === "es" ? "es-ES" : lang === "fr" ? "fr-FR" : "en-US";
     }
     
     // Configure for auto-send in Voice Console
@@ -408,6 +417,11 @@ function TutorPage() {
 
     if (!recognitionRef.current) {
       initializeRecognition();
+    }
+
+    // Dynamically update the language
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = lang === "es" ? "es-ES" : lang === "fr" ? "fr-FR" : "en-US";
     }
 
     // Configure for inline typing
