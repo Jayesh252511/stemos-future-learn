@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   Sparkles, Send, Atom, Sigma, FlaskConical, Code2, Plus, MessageSquare,
   BrainCircuit, Lightbulb, ListChecks, Globe2, FileText, Square,
-  BookOpen, Zap, Copy, Check, ChevronDown, Mic, Volume2
+  BookOpen, Zap, Copy, Check, ChevronDown, Mic, Volume2, VolumeX, Pause
 } from "lucide-react";
 import { Layout } from "@/components/site/Layout";
 import { streamChat, type ChatMsg } from "@/lib/ai-stream";
@@ -75,22 +75,318 @@ function TutorPage() {
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Voice Mode States
+  // Voice Mode States & Refs
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [recording, setRecording] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Stop speaking on component unmount
+  const [voiceEngine, setVoiceEngine] = useState<"system" | "elevenlabs">("system");
+  const [voiceState, setVoiceState] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
+  const [autoListen, setAutoListen] = useState(true);
+  const [liveTranscript, _setLiveTranscript] = useState("");
+  const [currentSpokenSentence, setCurrentSpokenSentence] = useState("");
+
+  const liveTranscriptRef = useRef("");
+  const setLiveTranscript = (val: string) => {
+    liveTranscriptRef.current = val;
+    _setLiveTranscript(val);
+  };
+
+  const speechQueue = useRef<string[]>([]);
+  const isSpeakingRef = useRef<boolean>(false);
+  const interruptedRef = useRef<boolean>(false);
+  const currentResponseBuffer = useRef<string>("");
+  const lastProcessedIndex = useRef<number>(0);
+
+  // Stop speaking and clean up on component unmount
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+      interrupt();
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
       }
     };
   }, []);
+
+  // Web Speech API Best Practice: Pre-load and cache voices
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      const loadVoices = () => {
+        window.speechSynthesis.getVoices();
+      };
+      loadVoices();
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+    }
+  }, []);
+
+  const interrupt = () => {
+    interruptedRef.current = true;
+    speechQueue.current = [];
+    isSpeakingRef.current = false;
+    setSpeaking(false);
+    
+    // Stop system TTS
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    
+    // Stop ElevenLabs audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    
+    setVoiceState("idle");
+  };
+
+  const handleVoiceToggle = (enabled: boolean) => {
+    setVoiceEnabled(enabled);
+    if (!enabled) {
+      interrupt();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    } else {
+      setVoiceState("idle");
+      // Short delay for UI transition, then start listening
+      setTimeout(() => {
+        startAutoListening();
+      }, 500);
+    }
+  };
+
+  const startAutoListening = () => {
+    if (interruptedRef.current || !voiceEnabled) return;
+    
+    // Cancel active synthesis/playback before listening
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    setVoiceState("listening");
+    setLiveTranscript("");
+    
+    if (typeof window === "undefined") return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Speech recognition is not supported in this browser. Try Chrome or Safari.");
+      return;
+    }
+    
+    if (!recognitionRef.current) {
+      initializeRecognition();
+    }
+    
+    // Configure for auto-send in Voice Console
+    recognitionRef.current.onend = () => {
+      setRecording(false);
+      const textToSend = liveTranscriptRef.current?.trim();
+      if (textToSend && voiceEnabled) {
+        send(textToSend);
+      } else {
+        setVoiceState("idle");
+      }
+    };
+
+    try {
+      recognitionRef.current.start();
+    } catch (err) {
+      console.log("Speech recognition start attempt:", err);
+    }
+  };
+
+  const initializeRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = lang === "es" ? "es-ES" : lang === "fr" ? "fr-FR" : "en-US";
+    
+    rec.onstart = () => {
+      setRecording(true);
+      if (voiceEnabled) {
+        setVoiceState("listening");
+      }
+      setLiveTranscript("");
+    };
+    
+    rec.onresult = (event: any) => {
+      let interimTranscript = "";
+      let finalTranscript = "";
+      
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+      
+      if (interimTranscript) {
+        setLiveTranscript(interimTranscript);
+      } else if (finalTranscript) {
+        setLiveTranscript(finalTranscript);
+      }
+    };
+    
+    rec.onerror = (e: any) => {
+      console.error("Speech recognition error:", e);
+      setRecording(false);
+      if (voiceEnabled) {
+        setVoiceState("idle");
+      }
+    };
+    
+    recognitionRef.current = rec;
+  };
+
+  const queueSentence = (sentence: string) => {
+    if (interruptedRef.current) return;
+    
+    // Remove markdown symbols to read cleanly
+    const clean = sentence
+      .replace(/(\*\*|__)(.*?)\1/g, "$2")
+      .replace(/(\*|_)(.*?)\1/g, "$2")
+      .replace(/`{1,3}[\s\S]*?`{1,3}/g, "")
+      .replace(/\[(.*?)\]\(.*?\)/g, "$1")
+      .replace(/#+\s+/g, "")
+      .trim();
+      
+    if (!clean) return;
+    speechQueue.current.push(clean);
+    processQueue();
+  };
+
+  const processQueue = async () => {
+    if (interruptedRef.current) {
+      isSpeakingRef.current = false;
+      setVoiceState("idle");
+      return;
+    }
+
+    if (speechQueue.current.length === 0) {
+      isSpeakingRef.current = false;
+      if (!streaming) {
+        if (voiceEnabled && autoListen) {
+          startAutoListening();
+        } else {
+          setVoiceState("idle");
+        }
+      } else {
+        setVoiceState("thinking");
+      }
+      return;
+    }
+
+    isSpeakingRef.current = true;
+    setVoiceState("speaking");
+    const sentence = speechQueue.current.shift()!;
+    setCurrentSpokenSentence(sentence);
+
+    try {
+      await speakSentence(sentence);
+    } catch (err) {
+      console.error("Speech playback error:", err);
+    } finally {
+      isSpeakingRef.current = false;
+      processQueue();
+    }
+  };
+
+  const speakSentence = (text: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (interruptedRef.current) {
+        resolve();
+        return;
+      }
+
+      if (voiceEngine === "system") {
+        if (typeof window === "undefined" || !window.speechSynthesis) {
+          reject(new Error("System speech synthesis not supported"));
+          return;
+        }
+        
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = lang === "es" ? "es-ES" : lang === "fr" ? "fr-FR" : "en-US";
+        
+        const voices = window.speechSynthesis.getVoices();
+        const matchVoice = voices.find(v => v.lang.startsWith(utterance.lang) && v.name.toLowerCase().includes("google"));
+        if (matchVoice) {
+          utterance.voice = matchVoice;
+        }
+        
+        utterance.onend = () => resolve();
+        utterance.onerror = (e) => {
+          console.error("System TTS error:", e);
+          resolve();
+        };
+        
+        window.speechSynthesis.speak(utterance);
+      } else {
+        fetch("/api/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        })
+        .then(resp => {
+          if (!resp.ok) throw new Error("ElevenLabs returned error");
+          return resp.blob();
+        })
+        .then(blob => {
+          if (interruptedRef.current) {
+            resolve();
+            return;
+          }
+          
+          const audioUrl = URL.createObjectURL(blob);
+          const audio = new Audio(audioUrl);
+          audioRef.current = audio;
+          
+          audio.onended = () => resolve();
+          audio.onerror = () => {
+            console.warn("ElevenLabs audio play error. Falling back to system TTS for this sentence...");
+            audioRef.current = null;
+            speakSentenceSystemFallback(text).then(resolve);
+          };
+          
+          audio.play().catch(err => {
+            console.error("Audio playback play() failed:", err);
+            speakSentenceSystemFallback(text).then(resolve);
+          });
+        })
+        .catch(err => {
+          console.warn("ElevenLabs request failed, falling back to system TTS:", err);
+          speakSentenceSystemFallback(text).then(resolve);
+        });
+      }
+    });
+  };
+
+  const speakSentenceSystemFallback = (text: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (typeof window === "undefined" || !window.speechSynthesis || interruptedRef.current) {
+        resolve();
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang === "es" ? "es-ES" : lang === "fr" ? "fr-FR" : "en-US";
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
+      window.speechSynthesis.speak(utterance);
+    });
+  };
 
   const toggleRecording = () => {
     if (typeof window === "undefined") return;
@@ -107,67 +403,26 @@ function TutorPage() {
       return;
     }
 
+    interrupt();
+    setLiveTranscript("");
+
     if (!recognitionRef.current) {
-      const rec = new SpeechRecognition();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = lang === "es" ? "es-ES" : lang === "fr" ? "fr-FR" : "en-US";
-
-      rec.onstart = () => setRecording(true);
-      rec.onend = () => setRecording(false);
-      rec.onerror = (e: any) => {
-        console.error("Speech recognition error:", e);
-        setRecording(false);
-      };
-      rec.onresult = (event: any) => {
-        const resultText = event.results[0][0].transcript;
-        setInput(prev => prev + " " + resultText);
-      };
-      recognitionRef.current = rec;
+      initializeRecognition();
     }
 
-    // Stop speaking when user starts recording
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-      setSpeaking(false);
-    }
+    // Configure for inline typing
+    recognitionRef.current.onend = () => {
+      setRecording(false);
+      const text = liveTranscriptRef.current?.trim();
+      if (text) {
+        setInput(prev => (prev + " " + text).trim());
+      }
+    };
 
-    recognitionRef.current.start();
-  };
-
-  const speakText = async (text: string) => {
-    if (!voiceEnabled) return;
     try {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-
-      setSpeaking(true);
-      const resp = await fetch("/api/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
-      });
-
-      if (!resp.ok) {
-        throw new Error("Failed to generate speech");
-      }
-
-      const audioBlob = await resp.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      
-      audio.onended = () => setSpeaking(false);
-      audio.onerror = () => setSpeaking(false);
-      
-      audioRef.current = audio;
-      audio.play();
-
+      recognitionRef.current.start();
     } catch (err) {
-      console.error("ElevenLabs vocal output error:", err);
-      setSpeaking(false);
+      console.log("Speech recognition start attempt:", err);
     }
   };
 
@@ -232,14 +487,15 @@ function TutorPage() {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    // Build locale string: use full language name for non-English
     const localeStr = lang !== "en" ? AI_LANG_NAME[lang] : undefined;
 
-    // Interrupt speech if currently speaking when sending a new message
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-      setSpeaking(false);
+    // Reset speech states
+    interrupt();
+    interruptedRef.current = false;
+    if (voiceEnabled) {
+      setVoiceState("thinking");
+      currentResponseBuffer.current = "";
+      lastProcessedIndex.current = 0;
     }
 
     try {
@@ -247,15 +503,41 @@ function TutorPage() {
         messages: next,
         signal: ctrl.signal,
         locale: localeStr,
-        onDelta: chunk => { acc += chunk; setStreamed(acc); },
+        onDelta: chunk => { 
+          acc += chunk; 
+          setStreamed(acc); 
+          
+          if (voiceEnabled) {
+            currentResponseBuffer.current = acc;
+            // Match completed sentences (ending with ., ?, !, or newlines)
+            let lastIdx = lastProcessedIndex.current;
+            const remainingText = acc.slice(lastIdx);
+            const matches = [...remainingText.matchAll(/[^.!?\n\r]+[.!?\n\r]+/g)];
+            if (matches.length > 0) {
+              for (const m of matches) {
+                const sentence = m[0].trim();
+                if (sentence) {
+                  queueSentence(sentence);
+                }
+                lastIdx += m[0].length;
+              }
+              lastProcessedIndex.current = lastIdx;
+            }
+          }
+        },
       });
       const finalMsgs = [...next, { role: "assistant" as const, content: acc }];
       setMessages(finalMsgs);
       persist(finalMsgs);
       
-      // Auto speak when response finishes
       if (voiceEnabled) {
-        speakText(acc);
+        // Queue any final remaining text that didn't end with a punctuation mark
+        const remaining = acc.slice(lastProcessedIndex.current).trim();
+        if (remaining) {
+          queueSentence(remaining);
+        }
+        // Run queue processor to ensure final sentence starts playing
+        processQueue();
       }
     } catch (e: any) {
       if (e?.name === "AbortError") {
@@ -272,6 +554,9 @@ function TutorPage() {
       setStreamed("");
       setStreaming(false);
       abortRef.current = null;
+      if (voiceEnabled) {
+        processQueue();
+      }
     }
   };
 
@@ -356,7 +641,7 @@ function TutorPage() {
           </div>
         </aside>
 
-        <section className="flex flex-col rounded-2xl border bg-card shadow-soft overflow-hidden h-full">
+        <section className="flex flex-col rounded-2xl border bg-card shadow-soft overflow-hidden h-full relative">
           <div className="relative border-b px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-lg bg-gradient-hero flex items-center justify-center shadow-glow">
@@ -378,14 +663,7 @@ function TutorPage() {
                 <input
                   type="checkbox"
                   checked={voiceEnabled}
-                  onChange={(e) => {
-                    setVoiceEnabled(e.target.checked);
-                    if (!e.target.checked && audioRef.current) {
-                      audioRef.current.pause();
-                      audioRef.current = null;
-                      setSpeaking(false);
-                    }
-                  }}
+                  onChange={(e) => handleVoiceToggle(e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className="relative w-8 h-4 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
@@ -509,6 +787,275 @@ function TutorPage() {
             </form>
             <p className="mt-2 text-[10px] text-muted-foreground text-center">{t("tutorDisclaimer")}</p>
           </div>
+
+          {/* Voice Console Overlay */}
+          <AnimatePresence>
+            {voiceEnabled && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.3 }}
+                className="absolute inset-0 bg-background/95 backdrop-blur-xl z-30 flex flex-col justify-between p-6 md:p-10 text-foreground"
+              >
+                {/* Top Controls */}
+                <div className="w-full flex items-center justify-between border-b pb-4 border-border/40">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <span className="text-sm font-bold tracking-tight text-foreground">STEMOS Voice Console</span>
+                  </div>
+                  
+                  {/* Toggle Switches */}
+                  <div className="flex items-center gap-4">
+                    {/* TTS Engine Switcher */}
+                    <div className="flex bg-secondary p-1 rounded-xl border border-border/40 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setVoiceEngine("system")}
+                        className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${voiceEngine === "system" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        System (Instant)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVoiceEngine("elevenlabs")}
+                        className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${voiceEngine === "elevenlabs" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        ElevenLabs (Premium)
+                      </button>
+                    </div>
+
+                    {/* Auto Listen Toggle */}
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold select-none text-muted-foreground hover:text-foreground transition">
+                      <span>Hands-Free Loop</span>
+                      <input
+                        type="checkbox"
+                        checked={autoListen}
+                        onChange={(e) => setAutoListen(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="relative w-8 h-4 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Main Console Center (Visualizer & Orb) */}
+                <div className="flex-1 flex flex-col items-center justify-center py-8">
+                  
+                  <div className="h-64 w-64 md:h-80 md:w-80 flex items-center justify-center relative">
+                    
+                    {/* Glowing Aura rings behind */}
+                    <div className="absolute inset-0 bg-primary/5 rounded-full filter blur-3xl opacity-60 animate-pulse" />
+
+                    <AnimatePresence mode="wait">
+                      {voiceState === "listening" && (
+                        <motion.div
+                          key="listening"
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.8, opacity: 0 }}
+                          className="relative flex items-center justify-center h-48 w-48"
+                        >
+                          {[0, 1, 2].map(i => (
+                            <motion.div
+                              key={i}
+                              initial={{ scale: 0.7, opacity: 0.8 }}
+                              animate={{ scale: 1.6, opacity: 0 }}
+                              transition={{ repeat: Infinity, duration: 2.2, delay: i * 0.7, ease: "easeOut" }}
+                              className="absolute inset-0 rounded-full border border-emerald-500 bg-emerald-500/5"
+                            />
+                          ))}
+                          <motion.div
+                            animate={{ scale: [1, 1.08, 1] }}
+                            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                            className="relative h-28 w-28 rounded-full bg-emerald-500 text-background flex items-center justify-center shadow-[0_0_40px_rgba(16,185,129,0.4)] border border-emerald-400"
+                          >
+                            <Mic className="h-10 w-10 text-white" />
+                          </motion.div>
+                        </motion.div>
+                      )}
+
+                      {voiceState === "thinking" && (
+                        <motion.div
+                          key="thinking"
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.8, opacity: 0 }}
+                          className="relative flex items-center justify-center h-40 w-40"
+                        >
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                            className="absolute inset-0 rounded-full border-t-2 border-r-2 border-violet-500 border-b-transparent border-l-transparent shadow-[0_0_20px_rgba(139,92,246,0.3)]"
+                          />
+                          <motion.div
+                            animate={{ rotate: -360 }}
+                            transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+                            className="absolute inset-4 rounded-full border-b-2 border-l-2 border-fuchsia-500 border-t-transparent border-r-transparent"
+                          />
+                          <div className="h-20 w-20 rounded-full bg-violet-500/10 flex items-center justify-center border border-violet-500/30">
+                            <Sparkles className="h-8 w-8 text-violet-400 animate-pulse" />
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {voiceState === "speaking" && (
+                        <motion.div
+                          key="speaking"
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.8, opacity: 0 }}
+                          className="flex items-end justify-center gap-2 h-32 w-full px-4"
+                        >
+                          {[...Array(9)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              animate={{ 
+                                height: ["15%", `${25 + Math.sin(i * 0.5) * 60 + Math.random() * 15}%`, "15%"],
+                              }}
+                              transition={{ 
+                                repeat: Infinity, 
+                                duration: 0.4 + Math.random() * 0.4, 
+                                ease: "easeInOut",
+                                delay: i * 0.04
+                              }}
+                              className="w-3 rounded-full bg-gradient-to-t from-cyan-600 to-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                            />
+                          ))}
+                        </motion.div>
+                      )}
+
+                      {voiceState === "idle" && (
+                        <motion.div
+                          key="idle"
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.8, opacity: 0 }}
+                          className="h-32 w-32 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 shadow-[0_0_50px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer hover:border-amber-500/60 transition-colors"
+                          onClick={startAutoListening}
+                        >
+                          <Volume2 className="h-10 w-10 text-amber-500 opacity-60 animate-pulse" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Live Subtitles / Transcripts */}
+                  <div className="w-full max-w-lg mt-6 text-center space-y-2 px-4 h-24 overflow-hidden flex flex-col justify-center">
+                    <AnimatePresence mode="wait">
+                      {voiceState === "listening" && (
+                        <motion.div
+                          key="listening-sub"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="space-y-1"
+                        >
+                          <div className="text-[11px] uppercase tracking-wider text-emerald-500 font-bold">Listening</div>
+                          <p className="text-sm font-medium text-foreground italic">
+                            {liveTranscript || "Speak your question..."}
+                          </p>
+                        </motion.div>
+                      )}
+
+                      {voiceState === "thinking" && (
+                        <motion.div
+                          key="thinking-sub"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="space-y-1"
+                        >
+                          <div className="text-[11px] uppercase tracking-wider text-violet-400 font-bold">Thinking</div>
+                          <p className="text-sm font-semibold text-muted-foreground animate-pulse">
+                            Formulating explanation...
+                          </p>
+                        </motion.div>
+                      )}
+
+                      {voiceState === "speaking" && (
+                        <motion.div
+                          key="speaking-sub"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="space-y-1"
+                        >
+                          <div className="text-[11px] uppercase tracking-wider text-cyan-400 font-bold">STEMOS Speaking</div>
+                          <p className="text-sm font-medium text-foreground max-w-md mx-auto line-clamp-3">
+                            {currentSpokenSentence || "Reading response..."}
+                          </p>
+                        </motion.div>
+                      )}
+
+                      {voiceState === "idle" && (
+                        <motion.div
+                          key="idle-sub"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="space-y-1"
+                        >
+                          <div className="text-[11px] uppercase tracking-wider text-amber-500 font-bold">Idle</div>
+                          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                            Click the center sphere or speak to begin.
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                {/* Bottom Control Actions */}
+                <div className="w-full flex items-center justify-center gap-4 border-t pt-6 border-border/40">
+                  {/* Mute/Interrupt Button */}
+                  {voiceState === "speaking" && (
+                    <button
+                      type="button"
+                      onClick={interrupt}
+                      className="flex items-center gap-2 bg-destructive/15 hover:bg-destructive/25 text-destructive border border-destructive/20 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm cursor-pointer"
+                    >
+                      <Square className="h-4 w-4 fill-current" /> Stop Audio
+                    </button>
+                  )}
+
+                  {voiceState === "listening" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (recognitionRef.current) {
+                          recognitionRef.current.stop();
+                        }
+                        setVoiceState("idle");
+                      }}
+                      className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 text-foreground border border-border px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm cursor-pointer"
+                    >
+                      <Volume2 className="h-4 w-4" /> Pause Mic
+                    </button>
+                  )}
+
+                  {voiceState === "idle" && (
+                    <button
+                      type="button"
+                      onClick={startAutoListening}
+                      className="flex items-center gap-2 bg-primary text-background px-5 py-2.5 rounded-2xl text-xs font-bold hover:opacity-90 transition shadow-sm cursor-pointer animate-pulse"
+                    >
+                      <Mic className="h-4 w-4" /> Start Speaking
+                    </button>
+                  )}
+
+                  {/* Exit Voice Mode */}
+                  <button
+                    type="button"
+                    onClick={() => handleVoiceToggle(false)}
+                    className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 border text-muted-foreground hover:text-foreground px-5 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer"
+                  >
+                    Exit Voice Mode
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
       </div>
     </Layout>
